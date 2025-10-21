@@ -850,19 +850,32 @@ Full Case Context for Analysis: "${input.userIssue}"`;
 
             return [
                 `**Internal Note Checklist**`,
+                
                 `\n**Consent to be recorded**: ${data.consent}`,
+                
                 `\n**Verification Method**: ${verificationMethod}`, 
+                
                 `\n**User-Account Type**: ${data.accountType}`,
                 `\n**User-Account ID**: ${data.accountId}`,
+                
                 `\n**Initial Check: Related cases read?**: ${data.checkedRelatedCases}`,
+                
                 `\n**Initial Check: Read through the entire thread?**: ${data.readEntireThread}`,
+                
                 `\n**List all user's concerns/inquiries**:\n${listConcerns}`,
+                
                 `\n**Topic**: ${data.topic}`,
+                
                 `\n**Summary of the issue**: ${data.summary}`,
+                
                 `\n**Steps I took** - List down/summarize the steps taken:\n${formatSteps(data.stepsITookRaw)}`,
+
+                
                 `\n**Check Lumos (RP used )**: NA`, 
+                
                 `\n**Check Confluence**: NA`, 
-                `\n**Specific Dashboard link (PUBLIC URL)**: ${data.caseLink && data.caseLink.includes('admin.corp.stripe.com') ? 'NA (Admin link provided)' : data.caseLink}`,
+                
+                `\n**Specific Dashboard link (PUBLIC URL)**: {base on Analysis}`,
                 `\n**Check Public Documentation (Docs, Support, API, etc.)**: ${data.finalLinks.length > 0 ? data.finalLinks.join(', ') : 'NA'}`,
                 `\n**Final Outcome**: ${data.outcomeSummary}`,
                 `\n**Why is the case open/pending**: ${data.caseStatus.includes('Open') || data.caseStatus.includes('Pending') ? data.caseStatus : 'NA'}`,
