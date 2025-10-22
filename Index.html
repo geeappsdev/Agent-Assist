@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeeApp - Support Assistant Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-blue': '#4c51bf',
+                        'primary-light': '#667eea',
+                        'secondary-gray': '#f7fafc',
+                        'accent-red': '#f56565',
+                        'success-green': '#48bb77',
+                        'caution-amber': '#f6e05e',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        .output-textarea {
+            min-height: 200px;
+            resize: vertical;
+            color: #1a202c; 
+            font-weight: 500;
+            white-space: pre-wrap; /* Ensure line breaks are respected */
+            overflow-wrap: break-word; /* Prevent long lines from overflowing */
+        }
+
+        .form-textarea, .output-textarea {
+            font-size: 16px !important; 
+        }
+
+        .action-button {
+            display: flex;
+            align-items: center;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.875rem; /* text-sm */
+            border-radius: 9999px; /* rounded-full */
+            transition: all 150ms ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        .action-button.primary {
+            background-color: #4c51bf; /* primary-blue */
+            color: white;
+        }
+        .action-button.primary:hover {
+            background-color: #667eea; /* primary-light */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        }
+        .action-button.secondary {
+            background-color: #e5e7eb; /* gray-200 */
+            color: #4b5563; /* gray-700 */
+        }
+        .action-button.secondary:hover {
+            background-color: #d1d5db; /* gray-300 */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        }
+
+        .draggable-panel.dragging {
+            opacity: 0.4;
+            border: 2px dashed #4c51bf; /* Use primary-blue color */
+        }
+        
+        #popOutButton {
+            z-index: 10;
+        }
+
+        .form-textarea {
+            width: 100%; 
+            padding: 0.75rem; 
+            border: 1px solid #d1d5db; 
+            border-radius: 0.5rem; 
+            transition: all 200ms ease-in-out;
+        }
+        .form-textarea:focus, .output-textarea:focus {
+            outline: none;
+            border-color: transparent;
+            box-shadow: 0 0 0 2px #4c51bf; /* primary-blue */
+        }
+         /* Style for read-only textareas in popout to preserve formatting */
+         .readonly-textarea {
+             white-space: pre-wrap;
+             overflow-wrap: break-word;
+         }
+    </style>
+</head>
+<body class="bg-secondary-gray font-sans min-h-screen flex flex-col items-center p-4 md:p-8">
+
+    <div id="app" class="max-w-7xl mx-auto w-full">
+        <header class="text-center mb-8 relative">
+            <h1 class="text-3xl font-bold text-primary-blue">GeeApp - Support Assistant</h1>
+            <p class="text-gray-600">Senior, Solution-Oriented Support Assistant AI</p>
+
+            <button type="button" onclick="popOutCurrentCase()" id="popOutButton" class="p-2 bg-gray-600 text-white rounded-full hover:bg-gray-700 transition duration-200 shadow-xl absolute top-0 right-0">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+            </button>
+        </header>
+
+        <div class="mb-8 w-full p-4 md:p-6 bg-yellow-100 border-l-4 border-caution-amber rounded-lg shadow-inner md:max-w-4xl md:mx-auto">
+            <h3 class="text-xl font-bold text-yellow-800 mb-2">Important Disclaimer &amp; Verification Checklist</h3>
+            <p class="text-sm text-gray-700">
+                The content generated includes links found via Google Search based on the case analysis.
+                <br><br>
+                **Agent Responsibility (Mandatory Check):** You must **always** manually verify the generated output for:
+                <ul class="list-disc list-inside mt-2 ml-4 space-y-1 font-semibold text-gray-800">
+                    <li>Accidental inclusion of **internal links or proprietary information**.</li>
+                    <li>Any user **PII** (Personally Identifiable Information) in the drafts.</li>
+                    <li>Ensuring all links provided are **relevant, correct, and public** Stripe pages.</li>
+                </ul>
+            </p>
+        </div>
+
+        <div class="p-6 bg-white rounded-xl shadow-lg mb-8 w-full md:max-w-4xl md:mx-auto">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700 border-b pb-2">What is the case about?</h2>
+            
+            <form id="assistant-form">
+                <textarea id="rawContextInput" 
+                    placeholder="Paste the entire case context here, including metadata like 'Topic:', 'Case ID:', 'Account ID:', 'User Name:'. The AI will infer the topic if not provided." 
+                    rows="15" 
+                    class="form-textarea mb-4" 
+                    required></textarea>
+                
+                <div class="flex space-x-3 mt-4">
+                    <button type="submit" id="generateButton" class="w-full py-3 bg-primary-blue text-white font-bold rounded-lg hover:bg-primary-light transition duration-200 shadow-xl">
+                        Analyze and Generate Responses
+                    </button>
+                </div>
+
+                <div id="loadingIndicator" class="hidden text-center mt-3 text-primary-blue">
+                    <svg class="animate-spin h-5 w-5 mr-3 inline-block" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Analyzing context and generating structured response...
+                </div>
+                <div id="errorMessage" class="hidden mt-3 p-3 bg-accent-red text-white rounded-lg"></div>
+            </form>
+        </div>
+        
+        <div id="outputContainer" class="mb-8 w-full">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700 border-b pb-2">Generated Outputs</h2>
+            
+            <div id="outputPanels" class="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 lg:grid-cols-3">
+                
+                <div class="bg-white rounded-xl shadow-lg p-4 draggable-panel cursor-move" id="panel-er" draggable="true">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-lg font-bold text-gray-700">Email Response (Copy)</h3>
+                        <div class="flex space-x-2">
+                            <button type="button" onclick="openModal('panel-er')" class="action-button primary">
+                                Expand
+                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5v4m0 0h-4m4-4l-5 5M4 16v4m0 0h4M4 20l5-5m11 5v-4m0 0h-4m4 4l-5-5"></path></svg>
+                            </button>
+                            <button type="button" onclick="copyToClipboard('outputER')" class="action-button bg-gray-800 text-white hover:bg-gray-700">
+                                <svg class="w-4 h-4 mr-1 inline-block" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-2 0V4H9a1 1 0 01-1-1z"></path><path d="M3 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V8z"></path></svg>
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="outputER" rows="10" class="output-textarea"></textarea>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-4 draggable-panel cursor-move" id="panel-eo" draggable="true">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-lg font-bold text-primary-blue">PWR email resources</h3>
+                        <div class="flex space-x-2">
+                            <button type="button" onclick="openModal('panel-eo')" class="action-button primary">
+                                Expand
+                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5v4m0 0h-4m4-4l-5 5M4 16v4m0 0h4M4 20l5-5m11 5v-4m0 0h-4m4 4l-5-5"></path></svg>
+                            </button>
+                            <button type="button" onclick="copyToClipboard('outputEO')" class="action-button bg-gray-800 text-white hover:bg-gray-700">
+                                <svg class="w-4 h-4 mr-1 inline-block" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-2 0V4H9a1 1 0 01-1-1z"></path><path d="M3 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V8z"></path></svg>
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="outputEO" rows="10" class="output-textarea"></textarea>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-4 draggable-panel cursor-move" id="panel-crn" draggable="true">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-lg font-bold text-primary-blue">Chat/RAC notes</h3>
+                         <div class="flex space-x-2">
+                            <button type="button" onclick="openModal('panel-crn')" class="action-button primary">
+                                Expand
+                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5v4m0 0h-4m4-4l-5 5M4 16v4m0 0h4M4 20l5-5m11 5v-4m0 0h-4m4 4l-5-5"></path></svg>
+                            </button>
+                            <button type="button" onclick="copyToClipboard('outputCRN')" class="action-button bg-gray-800 text-white hover:bg-gray-700">
+                                <svg class="w-4 h-4 mr-1 inline-block" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-2 0V4H9a1 1 0 01-1-1z"></path><path d="M3 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V8z"></path></svg>
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="outputCRN" rows="10" class="output-textarea"></textarea>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-4 draggable-panel cursor-move" id="panel-inv" draggable="true">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-lg font-bold text-primary-blue">Internal Note</h3>
+                        <div class="flex space-x-2">
+                            <button type="button" onclick="openModal('panel-inv')" class="action-button primary">
+                                Expand
+                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5v4m0 0h-4m4-4l-5 5M4 16v4m0 0h4M4 20l5-5m11 5v-4m0 0h-4m4 4l-5-5"></path></svg>
+                            </button>
+                            <button type="button" onclick="copyToClipboard('outputINV')" class="action-button bg-gray-800 text-white hover:bg-gray-700">
+                                <svg class="w-4 h-4 mr-1 inline-block" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-2 0V4H9a1 1 0 01-1-1z"></path><path d="M3 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V8z"></path></svg>
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="outputINV" rows="10" class="output-textarea"></textarea>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg p-4 draggable-panel cursor-move" id="panel-qs" draggable="true">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-lg font-bold text-primary-blue">Quick Summary</h3>
+                        <div class="flex space-x-2">
+                            <button type="button" onclick="openModal('panel-qs')" class="action-button primary">
+                                Expand
+                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5v4m0 0h-4m4-4l-5 5M4 16v4m0 0h4M4 20l5-5m11 5v-4m0 0h-4m4 4l-5-5"></path></svg>
+                            </button>
+                            <button type="button" onclick="copyToClipboard('outputQS')" class="action-button bg-gray-800 text-white hover:bg-gray-700">
+                                <svg class="w-4 h-4 mr-1 inline-block" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-2 0V4H9a1 1 0 01-1-1z"></path><path d="M3 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V8z"></path></svg>
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="outputQS" rows="10" class="output-textarea"></textarea>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    
+    <div id="expandedModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-gray-900 bg-opacity-75">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl h-5/6 flex flex-col">
+            <div class="p-4 border-b flex justify-between items-center">
+                <h3 id="modalTitle" class="text-xl font-bold text-primary-blue">Expanded View: </h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-900 transition duration-150">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-4 flex-grow overflow-hidden">
+                <textarea id="modalTextarea" class="w-full h-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-blue focus:border-transparent resize-none"></textarea>
+            </div>
+            <div class="p-4 border-t flex justify-end space-x-3">
+                <button onclick="copyModalContent()" class="py-2 px-4 bg-gray-800 text-white font-semibold rounded-lg hover:bg-gray-700 transition duration-200 shadow-md">
+                    Copy All
+                </button>
+                <button onclick="closeModal()" class="py-2 px-4 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition duration-200 shadow-md">
+                    Close & Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- *** END: HTML Structure *** -->
+
+    <script type="text/javascript">
+        // *** START: JavaScript Logic ***
+        
+        // Global variables for environment compatibility
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // --- Core Application Logic ---
+
+        // API key is set to an empty string. It will be provided by the runtime.
+        const apiKey = ""; 
+        const generateApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+        const searchApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`; // Same model, but with search tool
+
+        
+        const form = document.getElementById('assistant-form');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const errorMessage = document.getElementById('errorMessage');
+        const generateButton = document.getElementById('generateButton');
+        
+        const outputER = document.getElementById('outputER'); // Email Response
+        const outputEO = document.getElementById('outputEO'); // PWR email resources
+        const outputCRN = document.getElementById('outputCRN'); // Chat/RAC notes
+        const outputINV = document.getElementById('outputINV'); // Internal Note
+        const outputQS = document.getElementById('outputQS'); // Quick Summary
+        
+        let activePanelId = null;
+
+        /**
+         * Exponential backoff utility for API retries
+         */
+        async function fetchWithRetry(url, options, maxRetries = 5) {
+            let delay = 1000;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    
+                    if (response.status === 429) {
+                        if (i < maxRetries - 1) {
+                            // Do not log retry attempts as errors in the console
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 2;
+                            continue;
+                        }
+                        throw new Error('API rate limit exceeded after multiple retries.');
+                    }
+                    
+                    if (!response.ok) {
+                        const errorBody = await response.text();
+                        // Truncate error message for display
+                        throw new Error(`API returned status ${response.status}: ${errorBody.substring(0, 100)}...`);
+                    }
+
+                    return response.json();
+
+                } catch (error) {
+                    if (i === maxRetries - 1) {
+                        throw error;
+                    }
+                    // Do not log retry attempts as errors in the console
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
+        /**
+         * Custom Alert/Message Box function (since alert() is forbidden)
+         */
+        window.alertUser = function(message, type = 'info') {
+            const existingAlert = document.getElementById('custom-alert');
+            if (existingAlert) existingAlert.remove();
+
+            const alertBox = document.createElement('div');
+            alertBox.id = 'custom-alert';
+            alertBox.textContent = message;
+            
+            let bgColor = 'bg-primary-light';
+            if (type === 'success') bgColor = 'bg-success-green';
+            if (type === 'error') bgColor = 'bg-accent-red';
+            if (type === 'warning') bgColor = 'bg-caution-amber';
+
+            alertBox.className = `fixed top-4 right-4 z-50 p-3 rounded-lg text-white font-semibold shadow-xl transition-opacity duration-300 ${bgColor}`;
+            document.body.appendChild(alertBox);
+
+            setTimeout(() => {
+                alertBox.style.opacity = '0';
+                setTimeout(() => alertBox.remove(), 200);
+            }, 3000);
+        }
+
+        /**
+         * Copies content from the specified textarea ID to the clipboard.
+         */
+        window.copyToClipboard = function(elementId) {
+            const textarea = document.getElementById(elementId);
+            textarea.select();
+            // Use execCommand for iframe compatibility
+            try {
+                document.execCommand('copy');
+                alertUser('Copied to clipboard!', 'success');
+            } catch (err) {
+                console.error('Copy failed:', err);
+                alertUser('Failed to copy text.', 'error');
+            }
+        }
+        
+        // --- Modal Functions ---
+        
+        function getPanelData(panelId) {
+            const panel = document.getElementById(panelId);
+            const title = panel.querySelector('h3').textContent;
+            const textareaId = panel.querySelector('textarea').id;
+            const content = document.getElementById(textareaId).value;
+            return { title, content, textareaId };
+        }
+
+        window.openModal = function(panelId) {
+            activePanelId = panelId;
+            const { title, content } = getPanelData(panelId);
+
+            document.getElementById('modalTitle').textContent = `Expanded View: ${title}`;
+            document.getElementById('modalTextarea').value = content;
+            document.getElementById('expandedModal').classList.remove('hidden');
+        }
+
+        window.closeModal = function() {
+            if (activePanelId) {
+                const modalContent = document.getElementById('modalTextarea').value;
+                const originalTextareaId = document.getElementById(activePanelId).querySelector('textarea').id;
+                
+                // Save content back to the original textarea
+                document.getElementById(originalTextareaId).value = modalContent;
+                activePanelId = null;
+                alertUser('Changes saved!', 'info');
+            }
+            document.getElementById('expandedModal').classList.add('hidden');
+        }
+        
+        window.copyModalContent = function() {
+            const textarea = document.getElementById('modalTextarea');
+            textarea.select();
+            // Use execCommand for iframe compatibility
+            try {
+                document.execCommand('copy');
+                alertUser('Copied expanded content to clipboard!', 'success');
+            } catch (err) {
+                console.error('Copy failed:', err);
+                alertUser('Failed to copy text from expanded view.', 'error');
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !document.getElementById('expandedModal').classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const rawInput = document.getElementById('rawContextInput').value.trim();
+            
+            if (!rawInput) {
+                 errorMessage.textContent = 'Please paste the entire case context into the input box for analysis.';
+                 errorMessage.classList.remove('hidden');
+                 return;
+            }
+
+            const parsedContext = parseContext(rawInput); // Parse metadata like Case ID, User Name
+            
+            loadingIndicator.classList.remove('hidden');
+            generateButton.disabled = true;
+            errorMessage.classList.add('hidden');
+            
+            const loadingText = 'Analyzing context and generating structured response... Please wait.';
+            outputER.value = loadingText;
+            outputEO.value = loadingText;
+            outputCRN.value = loadingText;
+            outputINV.value = loadingText;
+            outputQS.value = loadingText;
+
+            let initialAnalysisResult = { topic: 'NA', summary: 'NA' }; // Holds results from Step 1
+            let searchResults = { realLinks: [] }; // Holds results from Step 2
+
+            try {
+                // --- Reverted 3-Step Process ---
+
+                // Step 1: Initial AI Analysis for Topic and Summary
+                loadingIndicator.textContent = "STEP 1/3: Analyzing context to determine topic and summary...";
+                initialAnalysisResult = await analyzeInitialContext(rawInput); // Renamed variable
+                let topicToSearch = initialAnalysisResult.topic !== 'NA' ? initialAnalysisResult.topic : ''; // Use AI-determined topic
+
+                // Step 2: Search for Links using the determined Topic + "Stripe"
+                loadingIndicator.textContent = `STEP 2/3: Searching for relevant Stripe links based on topic "${topicToSearch || 'context'}..."`;
+
+                if (topicToSearch) {
+                     searchResults = await searchForLinks(topicToSearch); // Search using the topic
+                     if (searchResults.realLinks.length === 0) {
+                          alertUser(`Warning: Could not find relevant Stripe links for topic "${topicToSearch}". Analysis fields may lack resources.`, 'warning');
+                     } else {
+                          loadingIndicator.textContent = `STEP 2/3 Complete. Found ${searchResults.realLinks.length} relevant Stripe links.`;
+                     }
+                } else {
+                     // If AI couldn't determine a topic in Step 1, skip the search
+                     alertUser("Warning: Could not determine topic from context. Skipping link search.", 'warning');
+                     loadingIndicator.textContent = `STEP 2/3 Skipped. No topic determined.`;
+                }
+
+                // Step 3: Call LLM to Generate Final Content for all 5 panels
+                loadingIndicator.textContent = "STEP 3/3: Generating final structured content...";
+                
+                // Pass parsed metadata, the full raw context, the summary from Step 1, and links from Step 2
+                // *** FIX: Pass initialAnalysisResult to generateFinalOutputs ***
+                const llmResponse = await generateFinalOutputs(parsedContext, rawInput, initialAnalysisResult, searchResults.realLinks);
+                
+                // 4. Display ALL Outputs in their respective textareas
+                displayAllOutputs(llmResponse);
+                
+            } catch (error) {
+                console.error("Generation failed:", error);
+                const errorText = `Error: ${error.message}. If the device is restricted from connecting to Google APIs, this service may not function. Check console for details.`;
+                errorMessage.textContent = errorText;
+                errorMessage.classList.remove('hidden');
+                // Display error in all output boxes for clarity
+                outputER.value = errorText;
+                outputEO.value = errorText;
+                outputCRN.value = errorText;
+                outputINV.value = errorText;
+                outputQS.value = errorText;
+            } finally {
+                // 5. Reset UI State after success or failure
+                loadingIndicator.classList.add('hidden');
+                generateButton.disabled = false;
+                loadingIndicator.textContent = "Analyzing context and generating structured response..."; // Reset loading text
+            }
+        });
+
+        // --- STEP 1: Initial AI Analysis ---
+        // Determines Topic and Summary from raw context.
+        async function analyzeInitialContext(rawInput) {
+            // Uses GeeApp persona just for analysis consistency
+            const analysisSystemPrompt = `You are "GeeApp", Gee’s Senior Support Assistant AI. Analyze the user's case context. Determine the main 'topic' (e.g., Payouts, Verification, Disputes, Connect Onboarding, ACH Debit) and provide a concise 1-sentence 'summary' of the core issue. Output ONLY a JSON object with these two keys: {"topic": "...", "summary": "..."}.
+
+Case Context: "${rawInput}"`;
+
+            const analysisPayload = {
+                contents: [{ parts: [{ text: "Determine the topic and summary." }] }],
+                systemInstruction: { parts: [{ text: analysisSystemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "topic": { "type": "STRING", "description": "The main topic category (e.g., Payouts, Verification)." },
+                            "summary": { "type": "STRING", "description": "A concise 1-sentence summary of the core issue." }
+                        },
+                        required: ["topic", "summary"],
+                    }
+                }
+            };
+
+            try {
+                const result = await fetchWithRetry(generateApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(analysisPayload)
+                });
+                const candidate = result.candidates?.[0];
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                     let analysisData = JSON.parse(candidate.content.parts[0].text);
+                     analysisData.topic = analysisData.topic?.trim() || 'NA';
+                     analysisData.summary = analysisData.summary?.trim().replace(/^["']|["']$/g, '') || 'Could not determine summary.';
+                     return analysisData;
+                } else {
+                     throw new Error("Failed to get topic/summary from initial analysis.");
+                }
+            } catch (error) {
+                console.error("Initial analysis failed:", error);
+                return { topic: 'NA', summary: 'Error during initial analysis. Check console.' };
+            }
+        }
+
+        // --- STEP 2: Search Function (using Topic determined in Step 1) ---
+        async function searchForLinks(topic) {
+            const searchString = `${topic} Stripe`; // Simple search query
+            const searchPayload = {
+                contents: [{ parts: [{ text: searchString }] }],
+                tools: [{ "google_search": {} }],
+                systemInstruction: { parts: [{ text: "Find the most relevant official Stripe documentation or support pages related to the user's query." }] }
+            };
+            
+            try {
+                const result = await fetchWithRetry(searchApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(searchPayload)
+                });
+                
+                const candidate = result.candidates?.[0];
+                let links = [];
+
+                const groundingMetadata = candidate?.groundingMetadata;
+                if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                    links = groundingMetadata.groundingAttributions
+                        .map(attribution => attribution.web?.uri)
+                        // Stricter filter for official docs/support
+                        .filter(uri => uri && (uri.startsWith('https://docs.stripe.com') || uri.startsWith('https://support.stripe.com') || uri.startsWith('https://stripe.com/docs')))
+                        .slice(0, 3); // Max 3 links
+                }
+                return { realLinks: links }; 
+
+            } catch (error) {
+                console.error(`Search API failed for topic "${topic}":`, error);
+                return { realLinks: [] }; // Return empty list on failure
+            }
+        }
+
+        // --- STEP 3: Generate Final Structured Content ---
+        // *** FIX: Added initialAnalysis parameter ***
+        async function generateFinalOutputs(parsedContext, fullCaseContext, initialAnalysis, realLinks) {
+            
+             // Format links as a plain list with '-' prefix for the prompt and output fields
+            const linkListString = realLinks.length > 0 ? realLinks.map(link => `- ${link}`).join('\n') : 'NA';
+            // Use the summary determined in Step 1
+            const finalSummary = initialAnalysis.summary; 
+
+            // *** GEEAPP PERSONA SYSTEM PROMPT ***
+            // Includes updated Tone, Link Placement, Spacing, and CSAT/Distress rules
+            const systemPrompt = `You are "GeeApp", Gee’s Senior, Solution-Oriented Support Assistant AI.
+Your mission is to generate accurate, empathetic, and well-structured support analyses and communication drafts for Stripe users based on the full case context provided.
+You must always use a warm, human-like, professional tone. 
+**Empathy Guidance:** Acknowledge the user's situation concisely ("I understand...", "I see...") and pivot quickly to the solution or next steps. Avoid overly negative language that dwells on the problem (e.g., avoid "frustrating," "inconvenient," "unfortunately"). Focus on being helpful, clear, and action-oriented.
+Prevent dissatisfaction (DSAT) through Positive Scripting and Never Blaming.
+You MUST add a double newline (\\n\\n) between each field in the analysis formats (EO, CL, INV, QS) for readability.
+
+**CRITICAL INSTRUCTION: SUMMARY & LINKS**
+The definitive summary of the issue is: "${finalSummary}"
+The following list of real, public Stripe URLs was found via search:
+${linkListString}
+1. You MUST use the definitive summary for the 'Summary of the issue' field.
+2. You MUST *NOT* include any links in the 'Email Response' body.
+3. You MUST include the provided links (formatted as a simple list with '-' prefixes as shown above, or 'NA' if none) in the relevant fields for 'PWR email resources', 'Chat/RAC notes', 'Internal Note', and 'Quick Summary'.
+4. DO NOT FABRICATE LINKS.
+5. Use the 'Parsed Context' data (Case ID, Account ID, User Name) where specified in the formats.
+
+**Response Formats Definitions (Generate the full text for these five):**
+
+1.  **Email Response (for "Email Response (Copy)" panel):**
+    * Purpose: Complete, user-facing email.
+    * Content: Start with "Hi ${parsedContext.userName}," (or "Hi there,"). Paragraphs only. No bullets. End with "Best, Gee".
+    * Tone: Positive empathy (acknowledge then solve). Simple English.
+    * Links: NO LINKS.
+
+2.  **EO (Email Outline) (for "PWR email resources" panel):**
+    * Purpose: Detailed agent analysis + resources.
+    * Structure (Use \\n\\n between fields):
+        * **Case ID:** ${parsedContext.caseId}\n\n
+        * **Summary of the issue:** ${finalSummary}\n\n
+        * **Relevant PWR resources:**\n${linkListString}\n\n
+        * **Analysis:**\n\n
+        * **Steps I took:**\n[Numbered list: Infer agent's ideal actions from context]\n\n
+        * **Information in the reply must include:**\n[Bulleted list: Critical points for email]\n\n
+        * **Already know:**\n[What user stated/knows]\n\n
+        * **Need to know:**\n[New info for user]\n\n
+        * **What the user need to do:**\n[User's next steps]\n\n
+        * **Outcome Summary:**\n[Resolution state]\n\n
+        * **DSAT analysis:**\n[Risk + mitigation]
+
+3.  **CL (Concise List) (for "Chat/RAC notes" panel):**
+    * Purpose: Simplified internal outline.
+    * Structure (Use \\n\\n between fields):
+        * **Have you checked all related cases?:** ${parsedContext.checkedRelatedCases}\n\n
+        * **Have you read through the entire thread?:** ${parsedContext.readEntireThread}\n\n
+        * **Summary of the issue:** ${finalSummary}\n\n
+        * **Steps I took:**\n[Numbered list: Infer agent's ideal actions]\n\n
+        * **Relevant object IDs:**\n[List IDs from context]\n\n
+        * **Final outcome:**\n[Resolution state]\n\n
+        * **Relevant documents:**\n${linkListString}
+
+4.  **INV (Internal Note) (for "Internal Note" panel):**
+    * Purpose: Detailed internal checklist.
+    * Structure (Use \\n\\n between fields):
+        * **Internal Note checklist**\n\n
+        * **Consent to be recorded:** ${parsedContext.consent}\n\n
+        * **Authentication/Verification PIN/PII?:** ${parsedContext.authVerification}\n\n
+        * **User-Account Type:** ${parsedContext.accountType}\n\n
+        * **User-Account ID:** ${parsedContext.accountId}\n\n
+        * **Have you checked all related cases?** ${parsedContext.checkedRelatedCases}\n\n
+        * **Have you read through the entire thread?** ${parsedContext.readEntireThread}\n\n
+        * **List all user's concerns/inquiries:**\n[Bulleted list from context]\n\n
+        * **Topic:** ${initialAnalysis.topic}\n\n  
+        * **Summary of the issue:** ${finalSummary}\n\n
+        * **Steps I took:**\n[Numbered list: Infer agent's ideal actions]\n\n
+        * **Check Lumos (RP used):** NA\n\n
+        * **Check Confluence:** NA\n\n
+        * **Specific Dashboard link:** ${parsedContext.caseLink}\n\n
+        * **Check Public Documentation:**\n${linkListString}\n\n
+        * **Final Outcome:**\n[Category] - [Summary]\n\n
+        * **Why is the case open/pending:**\n[Rationale]
+
+5.  **QS (Quick Summary) (for "Quick Summary" panel):**
+    * Purpose: Brief summary + CSAT/Distress assessment.
+    * Structure (Use \\n\\n between fields):
+        * **Summary of the issue:** ${finalSummary}\n\n
+        * **Case link:** ${parsedContext.caseLink}\n\n
+        * **Case ID:** ${parsedContext.caseId}\n\n
+        * **Account ID:** ${parsedContext.accountId}\n\n
+        * **User-Account ID Platform:** NA\n\n
+        * **User-Account ID Connected Account:** NA\n\n
+        * **Speculation:**\n[Possible resolution]\n\n
+        * **What Can I tell the user?:**\n[Draft response, paragraph, empathetic, no links]\n\n
+        * **Relevant Stripe resources:**\n${linkListString}\n\n
+        * **Relevant IDs:**\n[List IDs from context]\n\n
+        * **Will this case be a CSAT?:**\n[YES/NO/UNCERTAIN]\n\n
+        * **Is the user distressed?:**\n[YES/NO]
+
+**Full Case Context for Analysis:**
+"""
+${fullCaseContext}
+"""
+`;
+
+            const userQuery = `Generate the five outputs (Email Response, EO format, CL format, INV format, QS format) as a single JSON object based on the full case context and the critical instructions in the system prompt. Ensure all analysis fields (EO, CL, INV, QS) have double newlines between each field.`;
+            
+            // JSON schema defines the expected structure of the AI's response
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "generatedER": { "type": "STRING", "description": "The full, user-facing email." },
+                            "generatedEO": { "type": "STRING", "description": "The complete EO format text." },
+                            "generatedCL": { "type": "STRING", "description": "The complete CL format text." },
+                            "generatedINV": { "type": "STRING", "description": "The complete INV format text." },
+                            "generatedQS": { "type": "STRING", "description": "The complete QS format text." }
+                        },
+                        required: ["generatedER", "generatedEO", "generatedCL", "generatedINV", "generatedQS"]
+                    }
+                }
+            };
+            
+            const result = await fetchWithRetry(generateApiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const candidate = result.candidates?.[0];
+            
+            if (candidate && candidate.content?.parts?.[0]?.text) {
+                const jsonString = candidate.content.parts[0].text;
+                // Attempt to parse the JSON string from the AI
+                try {
+                    return JSON.parse(jsonString); 
+                } catch (parseError) {
+                     console.error("Failed to parse JSON response from final AI call:", jsonString, parseError);
+                     throw new Error("AI returned invalid JSON data for final outputs.");
+                }
+            } else {
+                // Handle cases where the API response structure is unexpected
+                console.error("Invalid response structure received from final API call:", result);
+                throw new Error("Invalid response structure or no content from final API call.");
+            }
+        }
+        
+        // Parses metadata from raw text input
+        function parseContext(rawText) {
+            const data = {
+                caseId: 'NA', caseLink: 'NA', accountId: 'NA', userName: 'there', 
+                topic: 'NA', // AI will try to fill this in Step 1
+                accountType: 'NA', consent: 'YES', 
+                checkedRelatedCases: 'YES', readEntireThread: 'YES', authVerification: 'NA'
+            };
+            const lines = rawText.split('\n').map(line => line.trim());
+            for (const line of lines) {
+                if (line.length === 0) continue;
+                const parts = line.split(':');
+                if (parts.length > 1) {
+                    const key = parts[0].trim().toLowerCase();
+                    const value = parts.slice(1).join(':').trim();
+                    if (key === 'case id') data.caseId = value.toUpperCase() || 'NA';
+                    else if (key === 'case link') data.caseLink = value || 'NA';
+                    else if (key === 'account id') data.accountId = value || 'NA';
+                    else if (key === 'user name') data.userName = value.split(' ')[0] || 'there';
+                    // Allow overriding AI topic if provided explicitly
+                    else if (key === 'topic') data.topic = value || 'NA'; 
+                    else if (key === 'user-account type') data.accountType = value || 'NA';
+                    else if (key === 'consent') data.consent = value.toUpperCase() || 'YES';
+                    else if (key === 'verification method') data.authVerification = value || 'NA';
+                }
+            }
+            // If user provided a topic, keep it, otherwise let AI determine it later.
+            // This `data.topic` isn't directly used for search anymore but is useful for INV format.
+            if(data.topic === '') data.topic = 'NA'; 
+            return data;
+        }
+
+        // Displays the generated outputs in the textareas
+        function displayAllOutputs(responseData) {
+             if (!responseData) {
+                 console.error("Received null/undefined data in displayAllOutputs");
+                 const errorMsg = "Error: Failed to receive valid data from AI.";
+                 outputER.value = errorMsg; outputEO.value = errorMsg; outputCRN.value = errorMsg; outputINV.value = errorMsg; outputQS.value = errorMsg;
+                 return;
+             }
+             
+            // Directly assign generated content to textareas, with fallbacks
+            outputER.value = responseData.generatedER || "Error generating Email Response.";
+            outputEO.value = responseData.generatedEO || "Error generating PWR email resources.";
+            outputCRN.value = responseData.generatedCL || "Error generating Chat/RAC notes.";
+            outputINV.value = responseData.generatedINV || "Error generating Internal Note.";
+            outputQS.value = responseData.generatedQS || "Error generating Quick Summary.";
+        }
+
+        // --- Drag and Drop Logic (No changes needed) ---
+        let draggedPanel = null;
+        function handleDragStart(e) {
+             if (!e.target.closest('.draggable-panel')) return;
+             draggedPanel = e.target.closest('.draggable-panel');
+             e.dataTransfer.effectAllowed = 'move';
+             e.dataTransfer.setData('text/html', draggedPanel.id);
+             setTimeout(() => { if (draggedPanel) draggedPanel.classList.add('opacity-40'); }, 0);
+        }
+        function handleDragOver(e) {
+             e.preventDefault();
+             const target = e.target.closest('.draggable-panel');
+             if (target && draggedPanel && target !== draggedPanel) {
+                 const container = document.getElementById('outputPanels');
+                 const children = Array.from(container.children).filter(el => el.classList.contains('draggable-panel'));
+                 const draggedIndex = children.indexOf(draggedPanel);
+                 const targetIndex = children.indexOf(target);
+                 if (draggedIndex === -1 || targetIndex === -1) return;
+                 const rect = target.getBoundingClientRect();
+                 const next = (e.clientY - rect.top) / rect.height > 0.5;
+                 if (next) { container.insertBefore(draggedPanel, target.nextSibling); } 
+                 else { container.insertBefore(draggedPanel, target); }
+             }
+        }
+        function handleDrop(e) {
+             e.preventDefault();
+             if (draggedPanel) { draggedPanel.classList.remove('opacity-40'); }
+             draggedPanel = null;
+        }
+        function handleDragEnd(e) {
+             if (e.target.classList.contains('draggable-panel')) {
+                 e.target.classList.remove('opacity-40');
+             }
+             draggedPanel = null; 
+        }
+        
+        // --- Popout Feature Logic (No changes needed) ---
+        window.popOutCurrentCase = function() {
+            const outputFields={er:document.getElementById('outputER'),eo:document.getElementById('outputEO'),crn:document.getElementById('outputCRN'),inv:document.getElementById('outputINV'),qs:document.getElementById('outputQS')};
+            const primaryContent=outputFields.er.value.trim();if(!primaryContent||primaryContent.includes('loading')||primaryContent.includes('Error')){alertUser('Please analyze the case and generate content before using the Pop Out feature.','error');return;}
+            let caseTitle='Case Snapshot';try{let eoContent=outputFields.eo.value;let match=eoContent.match(/Case ID:\s*([^\n]+)/);if(!match||!match[1]||match[1].trim()==='NA'){const qsContent=outputFields.qs.value;match=qsContent.match(/Case ID:\s*([^\n]+)/);} if(match&&match[1]&&match[1].trim()!=='NA'){caseTitle=`Case Snapshot: ${match[1].trim()}`;}}catch(e){console.error("Error parsing Case ID for popout title:",e);}
+            const caseData={title:caseTitle,outputs:{er:outputFields.er.value,eo:outputFields.eo.value,crn:outputFields.crn.value,inv:outputFields.inv.value,qs:outputFields.qs.value}};
+            const popoutKey=`popout_case_${Date.now()}`;localStorage.setItem(popoutKey,JSON.stringify(caseData));
+            const popoutUrl=`${window.location.origin}${window.location.pathname}?popoutKey=${popoutKey}`;const popoutWindow=window.open(popoutUrl,'_blank','width=800,height=600,scrollbars=yes,resizable=yes');
+            if(popoutWindow){document.getElementById('rawContextInput').value='';outputFields.er.value='';outputFields.eo.value='';outputFields.crn.value='';outputFields.inv.value='';outputFields.qs.value='';alertUser('Case popped out successfully! Input and outputs cleared for a new case.','success');}else{alertUser('Pop-up blocked by browser. Please enable pop-ups for this site.','error');}
+         }
+
+        function initializePopoutView(key) {
+             const serializedData=localStorage.getItem(key);const appElement=document.getElementById('app');
+             appElement.innerHTML='';appElement.classList.remove('max-w-7xl');appElement.classList.add('max-w-4xl','p-4');
+             document.body.classList.remove('p-4','md:p-8');const modal=document.getElementById('expandedModal');if(modal)modal.remove(); 
+             if(!serializedData){appElement.innerHTML='<h1 class="text-3xl font-bold text-accent-red text-center">Error: Case data not found.</h1><p class="text-center mt-4">Please ensure the original window is still open or try popping out the case again.</p>';return;}
+             const caseData=JSON.parse(serializedData);const outputs=caseData.outputs;document.title=caseData.title;
+             const popoutHTML=`<header class="text-center mb-6"><h1 class="text-2xl font-bold text-primary-blue">${caseData.title}</h1><p class="text-gray-600 mt-2">Read-Only Snapshot. Close this window when finished.</p></header><div class="mb-6 w-full p-4 bg-white border-l-4 border-gray-300 rounded-lg shadow-inner"><p class="text-sm text-gray-700 font-semibold">This is a read-only snapshot. Content in this window is not editable.</p></div><div class="space-y-6">${createReadonlyPanel('Email Response (Copy)',outputs.er,'output-popout-er')}${createReadonlyPanel('PWR email resources',outputs.eo,'output-popout-eo')}${createReadonlyPanel('Chat/RAC notes',outputs.crn,'output-popout-crn')}${createReadonlyPanel('Internal Note',outputs.inv,'output-popout-inv')}${createReadonlyPanel('Quick Summary',outputs.qs,'output-popout-qs')}</div><div class="text-center mt-8 p-4 bg-white rounded-xl shadow-lg flex justify-center space-x-4"><button onclick="copyAllPopoutContent()" class="py-3 px-6 bg-gray-800 text-white font-bold rounded-lg hover:bg-gray-700 transition duration-200 shadow-xl">Copy All Content</button><button onclick="window.close()" class="py-3 px-6 bg-accent-red text-white font-bold rounded-lg hover:bg-red-700 transition duration-200 shadow-xl">Close Snapshot</button></div>`;
+             appElement.innerHTML=popoutHTML;
+             function createReadonlyPanel(title,content,id){
+                // Added readonly-textarea class
+                return `<div class="bg-white rounded-xl shadow-lg p-4"><div class="flex justify-between items-center mb-3"><h3 class="text-xl font-bold text-primary-blue">${title}</h3><button onclick="copyPopoutContent('${id}')" class="action-button bg-gray-800 text-white hover:bg-gray-700"><svg class="w-4 h-4 mr-1 inline-block" fill="currentColor" viewBox="0 0 20 20"><path d="M8 3a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-2 0V4H9a1 1 0 01-1-1z"></path><path d="M3 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V8z"></path></svg>Copy ${title.split(' ')[0]}</button></div><textarea id="${id}" class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 h-64 resize-y font-mono text-sm readonly-textarea" readonly>${content}</textarea></div>`;
+             }
+        }
+
+        window.copyPopoutContent = function(elementId) {
+            const textarea=document.getElementById(elementId);if(!textarea)return;textarea.select();
+            try{document.execCommand('copy');window.alertUser('Copied content to clipboard!','success');} 
+            catch(err){window.alertUser('Failed to copy text.','error');}
+         };
+
+        window.copyAllPopoutContent = function() {
+            const allContent=[document.getElementById('output-popout-er').value,document.getElementById('output-popout-eo').value,document.getElementById('output-popout-crn').value,document.getElementById('output-popout-inv').value,document.getElementById('output-popout-qs').value].join('\n\n--- OUTPUT SECTION BREAK ---\n\n');
+            const tempTextarea=document.createElement('textarea');tempTextarea.value=allContent;document.body.appendChild(tempTextarea);tempTextarea.select();
+            try{document.execCommand('copy');tempTextarea.remove();window.alertUser('Copied ALL content to clipboard!','success');} 
+            catch(err){tempTextarea.remove();window.alertUser('Failed to copy all content.','error');}
+         };
+
+
+        // --- Event Listener Setup ---
+        window.addEventListener('load', () => {
+             // --- Popout Logic Check ---
+            const urlParams = new URLSearchParams(window.location.search);
+            const popoutKey = urlParams.get('popoutKey');
+            if (popoutKey) { initializePopoutView(popoutKey); return; }
+
+            // --- Standard App Setup ---
+            document.querySelectorAll('.draggable-panel').forEach(panel => {
+                panel.addEventListener('dragstart', handleDragStart);
+                panel.addEventListener('dragend', handleDragEnd);
+            });
+            const outputPanels = document.getElementById('outputPanels');
+            outputPanels.addEventListener('dragover', handleDragOver);
+            outputPanels.addEventListener('drop', handleDrop);
+            document.querySelectorAll('.form-input, .form-textarea, .output-textarea').forEach(el => {});
+        });
+
+        // *** END: JavaScript Logic ***
+    </script>
+</body>
+</html>
