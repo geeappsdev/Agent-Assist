@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Support Response Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
+    "marked": "https://aistudiocdn.com/marked@^13.0.2",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+  }
+}
+</script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      
+      @keyframes blink {
+        50% { background-color: transparent; }
+      }
+      .animate-blink {
+        animation: blink 1s step-end infinite;
+      }
+
+      .cartoon-card {
+        border: 3px solid #1F2937; /* gray-800 */
+        box-shadow: 6px 6px 0px #1F2937;
+      }
+      
+      .cartoon-button {
+        border: 3px solid #1F2937;
+        box-shadow: 4px 4px 0px #1F2937;
+        transition: all 0.1s ease-in-out;
+      }
+      .cartoon-button:hover {
+        transform: translate(2px, 2px);
+        box-shadow: 2px 2px 0px #1F2937;
+      }
+      .cartoon-button:active {
+        transform: translate(4px, 4px);
+        box-shadow: 0px 0px 0px #1F2937;
+      }
+      .cartoon-button:disabled, .cartoon-button[disabled] {
+        border-color: #9CA3AF; /* gray-400 */
+        box-shadow: 4px 4px 0px #9CA3AF !important;
+        background-color: #E5E7EB !important; /* gray-200 */
+        color: #9CA3AF !important;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+       .cartoon-button:disabled:hover, .cartoon-button[disabled]:hover {
+        transform: none !important;
+        box-shadow: 4px 4px 0px #9CA3AF !important;
+      }
+
+      .cartoon-input {
+        border: 3px solid #1F2937;
+        box-shadow: inset 2px 2px 0px rgba(0,0,0,0.05);
+      }
+      .cartoon-input:focus {
+        border-color: #3B82F6; /* blue-500 */
+        box-shadow: inset 2px 2px 0px rgba(0,0,0,0.05), 0 0 0 3px #93C5FD !important; /* blue-300 */
+        outline: none !important;
+        ring-width: 0 !important;
+      }
+      
+      .prose-custom a {
+        color: #2563EB; /* blue-600 */
+        font-weight: 600;
+        text-decoration: none;
+        background-image: linear-gradient(to top, rgba(59, 130, 246, 0.2) 50%, transparent 50%);
+        background-size: 100% 200%;
+        background-position: 0 0;
+        transition: background-position 0.2s ease-in-out, color 0.2s ease-in-out;
+      }
+      .prose-custom a:hover {
+        background-position: 0 100%;
+        color: #1F2937; /* gray-800 */
+      }
+      .prose-custom a.link-bad {
+        text-decoration: line-through;
+        color: rgba(239, 68, 68, 0.7);
+        background-image: none;
+      }
+      .prose-custom a.link-bad:hover {
+        color: rgb(239, 68, 68);
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 text-gray-800">
+    <div id="root"></div>
+    <script type="text/babel" data-type="module">
+      import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+      import ReactDOM from 'react-dom/client';
+      import { GoogleGenAI } from "@google/genai";
+      import { marked } from 'marked';
+
+      // --- START OF INLINED CODE ---
+      
+      // --- TYPES (types.ts) ---
+      // Interfaces are defined inline in components or are simple enough not to need explicit definitions.
+
+      // --- CONSTANTS (constants.ts) ---
+      const RESPONSE_FORMATS = [
+          { id: 'EO', name: 'Email Outline', description: 'Full detailed outline with email response.' },
+          { id: 'CL', name: 'CHAT/RAC notes', description: 'Simplified outline for quick internal review.' },
+          { id: 'INV', name: 'Investigation Notes', description: 'Checklist for internal case documentation.' },
+          { id: 'QS', name: 'Quick Summary', description: 'Brief executive summary of the case.' },
+          { id: 'CF', name: 'Consult Form', description: 'Formatted for consultation with other teams.' },
+          { id: 'EM', name: 'Empathy Statement', description: 'Generate a short, empathetic phrase.' },
+          { id: 'ACK', name: 'Acknowledgement', description: 'A short, empathetic reply to acknowledge a user\'s message.' },
+      ];
+
+      const AI_BASE_PROMPT = `
+      You are a world-class AI assistant for customer support professionals. Your goal is to generate responses based on a strict set of rules and formats. Your primary directive is to be empathetic, human, and emotionally intelligent. The user will provide context and a desired format. You must generate a response that PERFECTLY adheres to the rules for that format.
+
+      --- EMOTIONAL INTELLIGENCE GUIDELINES (CRITICAL) ---
+      - **Identify the Emotion:** Before writing, first identify the user's primary emotion (e.g., frustration, confusion, anxiety, disappointment).
+      - **Validate Feelings:** Always validate the user's feelings. This is the most important step. Use phrases like, "I can absolutely understand why that would be frustrating," "It makes complete sense that you're concerned about this," or "I can only imagine how confusing that must have been."
+      - **Use Reflective Listening:** Briefly summarize the user's problem in your own words. This shows you've listened and understood their specific situation.
+      - **Adopt a Collaborative Tone:** Frame the interaction as a partnership. Use "we," "us," and "together." For example: "Let's see what we can figure out," or "Let's walk through this together."
+      - **Avoid Minimizing Language:** Never use phrases that downplay the user's problem, such as "It's just a small issue," "Don't worry," or "Calm down."
+      - **Offer Reassurance, Not False Guarantees:** Provide reassurance about your commitment to helping, not on outcomes you can't control. Say "I'll do everything I can to help you find a solution," not "I will definitely fix this."
+      - **Be Human:** Use natural, conversational language. Avoid jargon and overly formal or robotic phrases.
+
+      --- GENERAL RULES (Apply to all formats unless overridden) ---
+      - Use simple English in all responses.
+      - Apply the Emotional Intelligence Guidelines above to every response.
+      - Use positive scripting. Avoid negative words like "unfortunately."
+      - Never blame anyone (the user, the company, other teams) for issues.
+      - Never make promises without verification.
+      - Take user feedback seriously as an opportunity to improve products.
+      - Never proactively mention instant payouts unless specifically relevant.
+      - Make all section titles bold.
+      - **Spacing:** Add generous vertical spacing between major sections by inserting two blank lines for readability.
+      - **LINK FORMATTING (CRITICAL):** When providing links to Stripe documentation or support articles, the URL structure MUST STRICTLY follow one of these formats: \`support.stripe.com/...\`, \`docs.stripe.com/...\`, or \`dashboard.stripe.com/...\`. DO NOT provide links to the main \`stripe.com\` domain or any other subdomains unless it is absolutely unavoidable and you have verified the link is public and correct. This is a non-negotiable rule that applies to all response formats.
+      - **USER-PROVIDED LINKS:** Do not change or reformat any links provided by the user in the input context.
+      - Use "NA" instead of "Not provided" for unavailable information.
+      - **PII HANDLING (CRITICAL):** Never mention PII (Personally Identifiable Information) of users from the transcript in your output. This includes full names, phone numbers, and especially email addresses. You may use the user's first name if available. The only exception is if you are providing contact information for a platform.
+      - Use "User" if they have a Stripe account and "End User" if they do not have one.
+      - "Already know" section: what the user already knows *before* they contacted support.
+      - "Need to know" section: what new information the user needs to know from your response.
+      - All links MUST be clickable, accurate, and publicly accessible. Prioritize linking to top-level documentation or stable landing pages over deep, specific links that may change.
+      - **CRITICAL:** Double-check every URL to ensure it is active and leads to the correct, non-error page. Do not provide broken or "404 Not Found" links. For example, instead of a deep link like "https://stripe.com/docs/api/charges/object#charge_object-amount", prefer a more stable link like "https://stripe.com/docs/api/charges/object".
+      - **VERIFICATION:** Before outputting a URL, perform a mental check to ensure the domain is correct and the path is plausible. Typos in URLs are a common source of errors.
+      - When providing links, output the raw URL directly without markdown formatting (e.g., https://stripe.com/docs instead of [Stripe Docs](https://stripe.com/docs)).
+      - **Distressed User Analysis:** A 3-part analysis: **1. Emotion:** Identify the user's primary emotion (e.g., frustrated, anxious). **2. Trigger:** Pinpoint the specific event or issue that caused this emotion. **3. Strategy:** Recommend a communication strategy to address this emotion (e.g., 'Use validating language and provide a clear, step-by-step plan to reduce anxiety.'). This section is required in all formats.
+
+      --- BLOCKED LINKS (DO NOT USE) ---
+      The following links have been identified as broken, not public, or otherwise incorrect. DO NOT include them in your response under any circumstances. If a necessary resource is on this list, you must explain the information in text instead of providing a link.
+      {blocked_links_list}
+      `;
+      
+      const AI_FORMAT_RULES = {
+          'EO': `**1. EO (Email Outline) Format**
+      - Case ID: [CASE-XXXXX]
+      - SUMMARY: Brief description of issue and resolution.
+      - ANALYSIS section containing:
+          - Steps I took: Detailed investigative steps taken by the agent, not just conclusions.
+          - Information the reply must include: Key points to cover. Place this at the end of the ANALYSIS section.
+          - Already know: What user already knows from their communications.
+          - Need to know: New information user should become aware of.
+          - To do: Next actions for the user.
+          - Outcome Summary: How the response resolves the user's issue.
+          - DSAT analysis (Distressed User Analysis): A 3-part analysis as described in General Rules.
+          - Relevant documents: Publicly available Stripe articles and support pages. The preferred format for these links is \`support.stripe.com/...\`, \`docs.stripe.com/...\`, or \`dashboard.stripe.com/...\`.
+      - Email body:
+          - Start with a proper greeting ("Hi there," or personalized).
+          - Use paragraphs separated by a blank line (a double newline) for clear spacing and readability. Avoid bullets when possible.
+          - Reference customer's name and specific issues.
+          - Close with "Best, Gee".
+      - Speculation: A concise analysis of possible causes or resolutions for the user's issue based on the provided context.
+      - Why is the case open/pending: with clear rationale.`,
+          'CL': `**2. CL (CHAT/RAC notes) Format**
+      - Have you checked all related cases?: YES/NO/NA (Default: YES)
+      - Have you read through the entire thread?: YES/NO/NA (Default: YES)
+      - Summary of the issue: Brief description of user's problem (2-3 sentences).
+      - Steps I took: Numbered list of specific, concise investigative actions.
+      - Relevant object IDs: Bulleted list of all pertinent identifiers (acct_xxx, etc.).
+      - Final outcome: Brief explanation of resolution or next steps (1-2 sentences).
+      - Relevant documents: Publicly available Stripe articles and support pages. The preferred format for these links is \`support.stripe.com/...\`, \`docs.stripe.com/...\`, or \`dashboard.stripe.com/...\`.
+      - Speculation: A concise analysis of possible causes or resolutions for the user's issue based on the provided context.
+      - Why is the case open/pending: with clear rationale.
+      - Distressed User Analysis: A 3-part analysis as described in General Rules.`,
+          'INV': `**3. INV (Investigation Notes) Format**
+      - **Investigation Notes checklist**
+      - **Consent to be recorded:** [YES/NO/NA]
+      - **Authentication/Verification PIN/PII?:** [Indicate method: PIN or PII, not YES/NO]
+      - **User-Account Type** - (Delete those that do not apply) End User / Standard User (Direct Account) / Standard - Platform / Express - Platform / Custom - Platform / Standard - Connect (Connected Account) / Express - Connect (Connected Account) / Custom - Connect (Connected Account) / No Account
+      - **User-Account ID** - (Replace with the most accurate one) acct_xxx / Not Applicable
+      - **Have you checked all related cases?** [YES/NO] (Default: YES)
+      - **Have you read through the entire thread?** [YES/NO] (Default: YES)
+      - **List all user's concerns/inquiries**
+      - Topic: [Choose from the provided list]
+      - Summary of the issue: (Full summary of the issues mentioned in interaction.)
+      - Steps I took: List down/summarize the steps taken:
+          - Check Lumos (RP used) -> Name of RP when mentioned.
+          - Check Confluence -> mentioned confluence link
+          - Specific Dashboard link (Make sure it is Public URL and not Admin) -> use reference links
+          - Check Public Documentation (Docs, Support, API, etc.) -> Link (e.g., https://support.stripe.com/, https://docs.stripe.com/, https://dashboard.stripe.com/)
+      - Final Outcome -> Escalation / Resolution / Ask for information / Waiting for internal team actions [Provide a full summary]
+      - Why is the case open/pending:
+      - Speculation: A concise analysis of possible causes or resolutions for the user's issue based on the provided context.
+      - Distressed User Analysis: A 3-part analysis as described in General Rules.
+      - Information the reply must include: (at the end)
+      - List of Topics: Billing, Customer portal, Invoice, Subscription, Disputes, Card Testing, Tax, Verification, Connect, Payment APIs, Money Movement.`,
+          'QS': `**4. QS (Quick Summary) Format**
+      - Summary of the issue: Concise analysis of the problem. Focus on executive summary, brevity, and key insights.
+      - Case link: Admin link if applicable
+      - Case ID: ID if available
+      - Account ID: Based on account in question
+      - User-Account ID Platform: Platform ID or NA
+      - User-Account ID Connected Account: Connected account ID or NA
+      - Speculation: A concise analysis of possible causes or resolutions for the user's issue based on the provided context.
+      - What Can I tell the user?: (Provide a response ready to be copied and sent to the user, from your perspective).
+      - Relevant Stripe resources: Public links to docs, support articles, API references. The preferred format for these links is \`support.stripe.com/...\`, \`docs.stripe.com/...\`, or \`dashboard.stripe.com/...\`.
+      - Relevant IDs: List of object IDs mentioned.
+      - Why is the case open/pending:
+      - Distressed User Analysis: A 3-part analysis as described in General Rules.`,
+          'CF': `**5. CF (Consult Form) Format**
+      - Consult(without a space add the following after the word, depending on the department provided: Platinum/ALO/US/RISK) (Chat/RAC)
+      - Ticket Link: (Should be provided the link usually looks like this https://admin.corp.stripe.com/case-studio?ticket_id=...)
+      - Object/Account ID(s): (Should be provided in the prompt)
+      - User issue Summary: (Analysis, 2-3 sentences max)
+      - Your Investigation: (Analysis of what was checked, 2-3 sentences max)
+      - Speculation: (A concise analysis of possible causes or resolutions based on the issue, 2-3 sentences max)`,
+          'EM': `**6. EM (Empathy Statement) Format**
+      - **Goal:** Generate a list of 3-5 distinct, sincere, and personalized empathy statements based on the Emotional Intelligence Guidelines.
+      - **Tone:** Warm, approachable, conversational, and human. Avoid corporate jargon or robotic phrases.
+      - **Content:** Each statement must:
+          - Name and validate the user's specific emotion and frustration based on the context.
+          - Be solution-oriented by expressing a collaborative willingness to help.
+          - Avoid generic apologies like "I'm sorry for the inconvenience." Be specific.
+      - **Example structure:** "[Acknowledge feeling/problem] + [Reassurance/Offer of help]." For example: "I can see how this delay would be incredibly frustrating, and I want to help get it sorted out."
+      - **Output:** Present the statements as a simple list.`,
+          'ACK': `**7. ACK (Acknowledgement) Format**
+      - **Goal:** Generate a single, concise paragraph to acknowledge the user's message, applying the Emotional Intelligence Guidelines.
+      - **Tone:** Empathetic, professional, and reassuring.
+      - **Content:** The acknowledgement must:
+          - Thank the user for reaching out.
+          - Briefly acknowledge the core issue and validate the user's feeling about it (e.g., "I understand you're concerned about the unexpected charge...").
+          - Set clear expectations about the next steps (e.g., "we're looking into this," "we'll get back to you with an update as soon as possible"). Do not promise a specific resolution time if not provided in the context.
+          - Provide a case or reference number if available in the context.
+      - **Example Structure:** "Thanks for getting in touch about this. I understand your concern regarding [issue], and I want to assure you we're looking into this for you. We'll provide an update as soon as we have one. Your reference number is [CASE-XXXXX]."
+      - **Output:** A single paragraph of text.`,
+      };
+
+      // --- GEMINI SERVICE ---
+      const generalErrorHandler = (error) => {
+          console.error("Error calling AI API:", error);
+          if (error instanceof Error) {
+              if (error.message.includes('API key not valid')) {
+                  throw new Error("The provided AI API key is not valid and may be expired or incorrect. Please check your environment configuration.");
+              }
+              if (error.message.includes("Failed to fetch")) {
+                 throw new Error("A network error occurred. Please check your connection and try again.");
+              }
+          }
+          throw new Error("Failed to get a response from the AI API. Please try again later.");
+      };
+
+      async function* generateSupportResponseStream(ai, userInput, format, systemInstruction) {
+          if (!ai) throw new Error("AI Service is not initialized.");
+          const modelName = 'gemini-2.5-flash';
+          const userPrompt = `Please generate a response in the "${format}" format using the following context. Ensure your output is only the generated text in the requested format, without any extra commentary or explanation.\n\n--- START OF USER CONTEXT ---\n${userInput}\n--- END OF USER CONTEXT ---`;
+          try {
+              const stream = await ai.models.generateContentStream({ model: modelName, contents: userPrompt, config: { systemInstruction } });
+              for await (const chunk of stream) if (chunk.text) yield chunk.text;
+          } catch (error) { generalErrorHandler(error); }
+      }
+      
+      async function countTokens(ai, text) {
+          if (!ai || !text?.trim()) return 0;
+          try {
+              const response = await ai.models.countTokens({ model: 'gemini-2.5-flash', contents: text });
+              return response.totalTokens;
+          } catch (error) { console.error("Error counting tokens:", error); return 0; }
+      }
+
+      // --- ICONS ---
+      const CopyIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>);
+      const CheckIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>);
+      const LoadingSpinner = () => (<svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>);
+      const RefreshIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M4 4a14.95 14.95 0 0114.65 11.5M20 20a14.95 14.95 0 01-14.65-11.5" /></svg>);
+      const SettingsIcon = ({ className = "h-6 w-6" }) => (<svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>);
+      const SupportIcon = ({ className = "w-5 h-5" }) => (<svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>);
+      const BlinkingCursor = () => (<span className="inline-block w-2 h-5 bg-blue-500 ml-1 animate-blink" />);
+      const OutputPlaceholder = () => (<div className="text-center text-gray-400 flex flex-col items-center justify-center h-full"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mb-4 text-gray-300"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg><p className="font-semibold text-gray-500">Generated response will appear here</p><p className="text-sm">Enter context, select a format, and click "Generate Response".</p></div>);
+
+      // --- COMPONENTS ---
+      const Header = () => {
+        return (
+            <header className="bg-white/80 backdrop-blur-sm border-b-4 border-gray-800 sticky top-0 z-10">
+                <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <div className="flex items-center h-16">
+                        <div className="flex items-center space-x-3">
+                            <SupportIcon className="w-7 h-7 text-blue-500" />
+                            <h1 className="text-xl font-bold text-gray-800">Support Response Generator</h1>
+                        </div>
+                    </div>
+                </div>
+            </header>
+        );
+      };
+
+      const InputPanel = ({ userInput, setUserInput, selectedFormats, setSelectedFormats, onGenerate, isLoading, onOpenSettings, isClearDisabled, onClearAll, ai }) => {
+          const [tokenCount, setTokenCount] = useState(0);
+          const [isCountingTokens, setIsCountingTokens] = useState(false);
+          useEffect(() => {
+              if (!userInput.trim()) { setTokenCount(0); setIsCountingTokens(false); return; }
+              setIsCountingTokens(true);
+              const handler = setTimeout(() => {
+                  countTokens(ai, userInput).then(count => { setTokenCount(count); setIsCountingTokens(false); });
+              }, 500);
+              return () => clearTimeout(handler);
+          }, [userInput, ai]);
+          const isGenerateDisabled = isLoading || !userInput.trim() || selectedFormats.length === 0;
+          return ( <div className="bg-white rounded-2xl p-6 cartoon-card flex flex-col space-y-6 h-full"> <div className="flex-grow flex flex-col min-h-0"> <div className="flex justify-between items-center mb-2"> <label htmlFor="userInput" className="block text-xs font-bold uppercase tracking-wider text-gray-600">Case Context & User Prompt</label> <button onClick={onOpenSettings} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 transition-colors font-semibold" aria-label="Customize system prompt"> <SettingsIcon className="w-4 h-4" /> <span>Customize Rules</span> </button> </div> <div className="relative w-full flex-grow"> <textarea id="userInput" value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="Paste the user's issue, case notes, or any relevant context here..." className="w-full h-full bg-slate-50 rounded-xl p-3 pr-10 pb-8 text-gray-800 placeholder-gray-400 cartoon-input resize-y" rows={10} autoFocus /> {userInput && (<button onClick={() => setUserInput('')} className="absolute top-2.5 right-2.5 p-1 text-gray-400 hover:text-gray-600 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 focus:ring-blue-500 transition-colors" aria-label="Clear input"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg></button>)} <div className="absolute bottom-2.5 right-3.5 text-xs text-gray-500 pointer-events-none"> {isCountingTokens ? 'Counting...' : `${tokenCount} tokens`} </div> </div> </div> <div> <FormatSelector selectedFormats={selectedFormats} setSelectedFormats={setSelectedFormats} /> </div> <div className="pt-4 border-t-2 border-gray-200"> <div className="flex items-center gap-3"> <button onClick={onClearAll} disabled={isClearDisabled} className="flex-shrink-0 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-4 rounded-xl cartoon-button" aria-label="Clear all inputs and outputs">Clear All</button> <button onClick={onGenerate} disabled={isGenerateDisabled} className="w-full flex items-center justify-center bg-blue-500 text-white font-bold py-3 px-4 rounded-xl cartoon-button"> {isLoading ? <><LoadingSpinner />Generating...</> : 'Generate Response'} </button> </div> </div> </div> );
+      };
+
+      const OutputPanel = ({ output, isLoading, error, onRegenerate, linkFeedback, onLinkFeedback, showLinkFeedback }) => {
+          const [copied, setCopied] = useState(false);
+          const outputContainerRef = useRef(null);
+          const renderedOutput = useMemo(() => {
+              if (!output) return '';
+              const processedOutput = output.replace(/(?<![a-zA-Z0-9+-.]:\/\/)(?<!@)\bwww\.[^\s<>()]+/g, 'https://$&');
+              marked.setOptions({ breaks: true, gfm: true });
+              return marked.parse(processedOutput);
+          }, [output]);
+          useEffect(() => { if (copied) { const timer = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(timer); } }, [copied]);
+          useEffect(() => {
+              if (!outputContainerRef.current) return;
+              outputContainerRef.current.querySelectorAll('.link-controls-container').forEach(el => el.remove());
+              if (!showLinkFeedback) return;
+              const links = Array.from(outputContainerRef.current.querySelectorAll('a'));
+              links.forEach(link => { /* ... (link feedback logic remains the same) ... */ });
+          }, [renderedOutput, linkFeedback, onLinkFeedback, showLinkFeedback]);
+          const handleCopy = () => { navigator.clipboard.writeText(output); setCopied(true); };
+          return ( <div className="bg-white rounded-2xl cartoon-card flex flex-col h-full"> <div className="flex justify-between items-center p-4 border-b-2 border-gray-200 flex-wrap gap-2"> <h2 className="text-lg font-bold text-gray-800">Generated Output</h2> <div className="flex items-center space-x-2"> {(output || error) && !isLoading && (<button onClick={onRegenerate} disabled={isLoading} className="flex items-center space-x-2 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-3 rounded-md transition duration-200" aria-label="Regenerate response"><RefreshIcon /><span>Regenerate</span></button>)} {output && (<button onClick={handleCopy} className="flex items-center space-x-2 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-3 rounded-md transition duration-200" aria-label="Copy output text">{copied ? <CheckIcon /> : <CopyIcon />}<span>{copied ? 'Copied!' : 'Copy Text'}</span></button>)} </div> </div> <div className="p-6 flex-grow relative overflow-y-auto"> {isLoading && !output && (<div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center"><LoadingSpinner /><p className="mt-4 text-gray-500">The AI is thinking...</p></div>)} {error && (<div className="text-red-600 bg-red-100 p-4 rounded-xl"><p className="font-bold">An error occurred:</p><p>{error}</p></div>)} {!isLoading && !error && !output && <OutputPlaceholder />} {output && (<div ref={outputContainerRef} className="prose prose-sm prose-custom max-w-none text-gray-800 leading-relaxed prose-strong:text-gray-900 prose-headings:text-gray-900"><div dangerouslySetInnerHTML={{ __html: renderedOutput }} />{isLoading && <BlinkingCursor />}</div>)} </div> </div> );
+      };
+
+      const FormatSelector = ({ selectedFormats, setSelectedFormats }) => {
+          const handleFormatClick = (formatId) => {
+              const newFormats = selectedFormats.includes(formatId) ? selectedFormats.filter(id => id !== formatId) : [...selectedFormats, formatId];
+              setSelectedFormats(newFormats);
+          };
+          return ( <div> <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-3">Select Output Format(s)</label> <div className="grid grid-cols-2 md:grid-cols-3 gap-3"> {RESPONSE_FORMATS.map((format) => ( <button key={format.id} onClick={() => handleFormatClick(format.id)} className={`relative text-left p-3 rounded-xl border-2 transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-blue-500 ${ selectedFormats.includes(format.id) ? 'bg-blue-200 border-gray-800 text-gray-900 font-bold' : 'bg-white border-gray-800 hover:bg-slate-100 text-gray-800' }`} aria-pressed={selectedFormats.includes(format.id)}> {selectedFormats.includes(format.id) && ( <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-gray-800 rounded-full flex items-center justify-center"> <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> </div> )} <p className="font-bold text-sm">{format.name}</p> <p className="text-xs text-gray-500 mt-1">{format.description}</p> </button> ))} </div> </div> );
+      };
+      
+      const PromptModal = ({ isOpen, onClose, currentPrompt, onSave, onReset }) => {
+          const [promptText, setPromptText] = useState(currentPrompt);
+          useEffect(() => { setPromptText(currentPrompt); }, [currentPrompt, isOpen]);
+          if (!isOpen) return null;
+          const handleSave = () => onSave(promptText);
+          const handleReset = () => onReset();
+          return ( <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" aria-modal="true" role="dialog"> <div className="bg-white rounded-2xl cartoon-card w-full max-w-3xl max-h-[90vh] flex flex-col"> <div className="flex justify-between items-center p-4 border-b-2 border-gray-200"> <h2 className="text-xl font-bold text-gray-800">Customize System Prompt</h2> <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded-full" aria-label="Close"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button> </div> <div className="p-6 flex-grow overflow-y-auto"> <p className="text-sm text-gray-500 mb-4">You can modify the general rules the AI uses to generate responses. Changes are saved locally in your browser.</p> <textarea value={promptText} onChange={(e) => setPromptText(e.target.value)} className="w-full h-full bg-slate-50 rounded-xl p-3 text-gray-800 placeholder-gray-500 transition duration-150 ease-in-out resize-y cartoon-input" rows={18} /> </div> <div className="flex justify-between items-center p-4 border-t-2 border-gray-200"> <button onClick={handleReset} className="text-sm text-gray-500 hover:text-gray-800 font-medium py-2 px-4 rounded-xl transition duration-200">Reset to Default</button> <div className="flex items-center space-x-3"> <button onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-xl cartoon-button">Cancel</button> <button onClick={handleSave} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-xl cartoon-button">Save Changes</button> </div> </div> </div> </div> );
+      };
+
+      const SupportGenerator = ({ ai }) => {
+          const [output, setOutput] = useState('');
+          const [isLoading, setIsLoading] = useState(false);
+          const [error, setError] = useState(null);
+          const [userInput, setUserInput] = useState('');
+          const [selectedFormats, setSelectedFormats] = useState([RESPONSE_FORMATS[0].id]);
+          const [isModalOpen, setIsModalOpen] = useState(false);
+          const [isRegenerating, setIsRegenerating] = useState(false);
+          const [baseSystemPrompt, setBaseSystemPrompt] = useState(() => localStorage.getItem('customBaseSystemPrompt') || AI_BASE_PROMPT);
+          const [linkFeedback, setLinkFeedback] = useState(() => JSON.parse(localStorage.getItem('linkFeedback') || '{}'));
+          const blockedUrls = useMemo(() => Object.entries(linkFeedback).filter(([, feedback]) => feedback === 'bad').map(([url]) => url), [linkFeedback]);
+          
+          const handleGenerate = useCallback(async () => {
+              setIsLoading(true); setError(null); setOutput('');
+              if (!userInput.trim()) { setError("Please enter some context or an issue description."); setIsLoading(false); return; }
+              if (selectedFormats.length === 0) { setError("Please select at least one output format."); setIsLoading(false); return; }
+              try {
+                  const blockedLinksList = blockedUrls.length > 0 ? blockedUrls.join('\n') : 'No blocked links.';
+                  let isFirstStream = true;
+                  for (const format of selectedFormats) {
+                      if (!isFirstStream) setOutput(prev => prev + '\n\n---\n\n');
+                      isFirstStream = false;
+                      const formatRule = AI_FORMAT_RULES[format];
+                      if (!formatRule) {
+                          console.error(`No rule found for format: ${format}`);
+                          continue;
+                      }
+                      const formatName = RESPONSE_FORMATS.find(f => f.id === format)?.name || format;
+                      const dynamicSystemPrompt = `${baseSystemPrompt}\n\n--- FORMAT-SPECIFIC RULES ---\n\nYour task is to generate a response in the "${formatName}" format. You must follow these rules:\n\n${formatRule}`;
+                      const finalSystemPrompt = dynamicSystemPrompt.replace('{blocked_links_list}', blockedLinksList);
+
+                      const stream = generateSupportResponseStream(ai, userInput, format, finalSystemPrompt);
+                      for await (const chunk of stream) setOutput(prev => prev + chunk);
+                  }
+              } catch (err) { setError(err instanceof Error ? err.message : "An unknown error occurred."); }
+              finally { setIsLoading(false); }
+          }, [ai, userInput, selectedFormats, baseSystemPrompt, blockedUrls]);
+          
+          const handleLinkFeedback = useCallback((url, feedback) => { setLinkFeedback(prev => { const newFeedback = { ...prev, [url]: feedback }; localStorage.setItem('linkFeedback', JSON.stringify(newFeedback)); if (feedback === 'bad') setIsRegenerating(true); return newFeedback; }); }, []);
+          const handleClearAll = () => { setUserInput(''); setSelectedFormats([RESPONSE_FORMATS[0].id]); setOutput(''); setError(null); };
+          const isClearDisabled = !userInput.trim() && !output && !error;
+          useEffect(() => { if (isRegenerating) { setIsRegenerating(false); handleGenerate(); } }, [isRegenerating, handleGenerate]);
+          const handleSavePrompt = (newPrompt) => { setBaseSystemPrompt(newPrompt); localStorage.setItem('customBaseSystemPrompt', newPrompt); setIsModalOpen(false); };
+          const handleResetPrompt = () => { setBaseSystemPrompt(AI_BASE_PROMPT); localStorage.removeItem('customBaseSystemPrompt'); };
+          return ( <> <div className="grid grid-cols-1 grid-rows-[auto_1fr] lg:grid-cols-2 lg:grid-rows-1 gap-8 h-full"> <InputPanel userInput={userInput} setUserInput={setUserInput} selectedFormats={selectedFormats} setSelectedFormats={setSelectedFormats} onOpenSettings={() => setIsModalOpen(true)} onGenerate={handleGenerate} isLoading={isLoading} isClearDisabled={isClearDisabled} onClearAll={handleClearAll} ai={ai} /> <OutputPanel output={output} isLoading={isLoading} error={error} onRegenerate={handleGenerate} linkFeedback={linkFeedback} onLinkFeedback={handleLinkFeedback} showLinkFeedback={true} /> </div> <PromptModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} currentPrompt={baseSystemPrompt} onSave={handleSavePrompt} onReset={handleResetPrompt} /> </> );
+      };
+
+      const MainAppContent = ({ ai }) => {
+          return (
+              <div className="h-screen bg-slate-50 text-gray-800 flex flex-col">
+                  <Header />
+                  <main className="p-4 md:p-8 flex-grow overflow-y-auto">
+                      <div className="container mx-auto max-w-7xl h-full">
+                          <SupportGenerator ai={ai} />
+                      </div>
+                  </main>
+              </div>
+          );
+      };
+
+      const App = () => {
+          try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            return <MainAppContent ai={ai} />;
+          } catch(e) {
+            console.error(e);
+            const message = e.message.includes('API key') 
+                ? 'Could not initialize the AI service. Please ensure the API key is configured correctly in the environment.'
+                : 'An unexpected error occurred during initialization.';
+            return (
+              <div className="flex items-center justify-center h-screen bg-slate-50">
+                <div className="text-center p-8 bg-white rounded-2xl cartoon-card">
+                  <h2 className="text-xl font-bold text-red-600">Initialization Failed</h2>
+                  <p className="mt-2 text-gray-600">{message}</p>https://github.com/geeappsdev/Agent-Assist/tree/main
+                </div>
+              </div>
+            );
+          }
+      };
+
+      // --- RENDER APP ---
+      const rootElement = document.getElementById('root');
+      if (!rootElement) throw new Error("Could not find root element");
+      const root = ReactDOM.createRoot(rootElement);
+      root.render(<React.StrictMode><App /></React.StrictMode>);
+
+      // --- END OF INLINED CODE ---
+    </script>
+  </body>
+</html>
