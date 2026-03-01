@@ -1,1083 +1,173 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Support Response Generator</title>
+    <title>AI Support Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="importmap">
-      {
-        "imports": {
-          "react": "https://aistudiocdn.com/react@^19.2.0",
-          "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
-          "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
-          "marked": "https://aistudiocdn.com/marked@^13.0.2"
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+                    },
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'blob': 'blob 10s infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        }
+                    },
+                    colors: {
+                        // Map 'indigo' to our CSS variables so we can swap themes dynamically
+                        indigo: {
+                            50: 'var(--c-50)',
+                            100: 'var(--c-100)',
+                            200: 'var(--c-200)',
+                            300: 'var(--c-300)',
+                            400: 'var(--c-400)',
+                            500: 'var(--c-500)',
+                            600: 'var(--c-600)',
+                            700: 'var(--c-700)',
+                            800: 'var(--c-800)',
+                            900: 'var(--c-900)',
+                        },
+                        zinc: {
+                            850: '#1f1f22',
+                            950: '#0c0c0e',
+                        }
+                    }
+                }
+            }
         }
-      }
     </script>
-    <style>
-      @keyframes blink {
-        50% { background-color: transparent; }
-      }
-      .animate-blink {
-        animation: blink 1s step-end infinite;
-      }
-      /* Custom prose styles for better link visibility and interaction */
-      .prose-custom a {
-        text-decoration: underline;
-        text-decoration-color: rgba(129, 140, 248, 0.5); /* Equivalent to indigo-400 with 50% opacity */
-        transition: color 0.2s ease-in-out, text-decoration-color 0.2s ease-in-out;
-      }
-      .prose-custom a:hover {
-        text-decoration-color: rgb(129, 140, 248); /* Equivalent to indigo-400 */
-      }
-      .prose-custom a.link-bad {
-        text-decoration: line-through;
-        color: rgba(248, 113, 113, 0.7); /* Equivalent to red-400 with 70% opacity */
-      }
-      .prose-custom a.link-bad:hover {
-        color: rgb(248, 113, 113); /* Equivalent to red-400 */
-      }
+    <style type="text/tailwindcss">
+        @layer base {
+            :root {
+                /* Default (Indigo) */
+                --c-50: #eef2ff; --c-100: #e0e7ff; --c-200: #c7d2fe; --c-300: #a5b4fc; --c-400: #818cf8;
+                --c-500: #6366f1; --c-600: #4f46e5; --c-700: #4338ca; --c-800: #3730a3; --c-900: #312e81;
+            }
+
+            .theme-sakura {
+                /* Pink/Rose */
+                --c-50: #fdf2f8; --c-100: #fce7f3; --c-200: #fbcfe8; --c-300: #f9a8d4; --c-400: #f472b6;
+                --c-500: #ec4899; --c-600: #db2777; --c-700: #be185d; --c-800: #9d174d; --c-900: #831843;
+            }
+
+            .theme-ocean {
+                /* Sky/Cyan */
+                --c-50: #f0f9ff; --c-100: #e0f2fe; --c-200: #bae6fd; --c-300: #7dd3fc; --c-400: #38bdf8;
+                --c-500: #0ea5e9; --c-600: #0284c7; --c-700: #0369a1; --c-800: #075985; --c-900: #0c4a6e;
+            }
+
+            .theme-mint {
+                /* Teal/Emerald */
+                --c-50: #f0fdfa; --c-100: #ccfbf1; --c-200: #99f6e4; --c-300: #5eead4; --c-400: #2dd4bf;
+                --c-500: #14b8a6; --c-600: #0d9488; --c-700: #0f766e; --c-800: #115e59; --c-900: #134e4a;
+            }
+
+            .theme-bumblebee {
+                /* Amber/Yellow - Adjusted for contrast */
+                --c-50: #fffbeb; --c-100: #fef3c7; --c-200: #fde68a; --c-300: #fcd34d; --c-400: #fbbf24;
+                --c-500: #f59e0b; --c-600: #d97706; --c-700: #b45309; --c-800: #92400e; --c-900: #78350f;
+            }
+            
+            .theme-lavender {
+                /* Purple/Violet */
+                --c-50: #f5f3ff; --c-100: #ede9fe; --c-200: #ddd6fe; --c-300: #c4b5fd; --c-400: #a78bfa;
+                --c-500: #8b5cf6; --c-600: #7c3aed; --c-700: #6d28d9; --c-800: #5b21b6; --c-900: #4c1d95;
+            }
+            
+            .theme-matcha {
+                /* Lime/Green */
+                --c-50: #f7fee7; --c-100: #ecfccb; --c-200: #d9f99d; --c-300: #bef264; --c-400: #a3e635;
+                --c-500: #84cc16; --c-600: #65a30d; --c-700: #4d7c0f; --c-800: #3f6212; --c-900: #365314;
+            }
+            
+            .theme-peach {
+                /* Orange/Coral */
+                --c-50: #fff7ed; --c-100: #ffedd5; --c-200: #fed7aa; --c-300: #fdba74; --c-400: #fb923c;
+                --c-500: #f97316; --c-600: #ea580c; --c-700: #c2410c; --c-800: #9a3412; --c-900: #7c2d12;
+            }
+        }
+
+        @layer utilities {
+            .scrollbar-thin::-webkit-scrollbar {
+                width: 6px;
+                height: 6px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-track {
+                @apply bg-transparent;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb {
+                /* Use lighter shade instead of opacity modifier */
+                @apply bg-indigo-200 dark:bg-indigo-300 rounded-full transition-colors;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+                @apply bg-indigo-300 dark:bg-indigo-400;
+            }
+            .glass-panel {
+                @apply bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-white/40 dark:border-white/5 shadow-xl;
+            }
+            .bg-noise {
+                background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.5'/%3E%3C/svg%3E");
+            }
+        }
     </style>
-  </head>
-  <body class="bg-slate-900">
+    <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "cors": "https://aistudiocdn.com/cors@^2.8.5",
+    "express": "https://aistudiocdn.com/express@^5.1.0",
+    "url": "https://aistudiocdn.com/url@^0.11.4"
+  }
+}
+</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- PrismJS for Syntax Highlighting (Tomorrow Night Theme) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+</head>
+<!-- Updated selection color to use solid lighter shade -->
+<body class="bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 transition-colors duration-300 min-h-screen overflow-hidden selection:bg-indigo-200 selection:text-indigo-900 dark:selection:bg-indigo-300 dark:selection:text-indigo-950 antialiased">
+    <!-- Refined Ambient Background with Dynamic Theme Colors -->
+    <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <!-- Primary Blob (Theme Color) - Use solid light shade with standard opacity class -->
+        <div class="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-indigo-200 dark:bg-indigo-400 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[120px] opacity-60 animate-blob"></div>
+        <!-- Secondary Blob -->
+        <div class="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-indigo-300 dark:bg-indigo-500 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[120px] opacity-60 animate-blob animation-delay-2000"></div>
+        
+        <!-- Noise Overlay -->
+        <div class="absolute inset-0 opacity-[0.04] dark:opacity-[0.07] bg-noise pointer-events-none mix-blend-overlay"></div>
+    </div>
+    
     <div id="root"></div>
-    <script type="module">
-      import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-      import ReactDOM from 'react-dom/client';
-      import { GoogleGenAI } from "@google/genai";
-      import { marked } from 'marked';
-
-      const API_KEY = 'AIzaSyBJm6-Spd00k_Vu8J7K5LwVhoZIy_ibdUk';
-
-      // --- Constants ---
-      const RESPONSE_FORMATS = [
-          { id: 'EO', name: 'Email Outline', description: 'Full detailed outline with email response.' },
-          { id: 'CL', name: 'CHAT/RAC notes', description: 'Simplified outline for quick internal review.' },
-          { id: 'INV', name: 'Investigation Notes', description: 'Checklist for internal case documentation.' },
-          { id: 'QS', name: 'Quick Summary', description: 'Brief executive summary of the case.' },
-          { id: 'CF', name: 'Consult Form', description: 'Formatted for consultation with other teams.' },
-          { id: 'EM', name: 'Empathy Statement', description: 'Generate a short, empathetic phrase.' },
-          { id: 'ACK', name: 'Acknowledgement', description: 'A short, empathetic reply to acknowledge a user\'s message.' },
-      ];
-      const AI_SYSTEM_PROMPT_RULES = `
-      You are a world-class AI assistant for customer support professionals. Your goal is to generate responses based on a strict set of rules and formats. The user will provide context and a desired format. You must generate a response that PERFECTLY adheres to the rules for that format.
-
-      --- GENERAL RULES (Apply to all formats unless overridden) ---
-      - Use simple English in all responses.
-      - Apply appropriate empathy. Be genuine and acknowledge specific pain points.
-      - Use a warm, approachable, professional, human tone.
-      - Use positive scripting. Avoid negative words like "unfortunately."
-      - Never blame anyone for issues.
-      - Never make promises without verification.
-      - Take user feedback to improve products.
-      - Never proactively mention instant payouts unless specifically relevant.
-      - Make all section titles bold.
-      - **Spacing:** Add generous vertical spacing between major sections by inserting two blank lines.
-      - Use "NA" instead of "Not provided" for unavailable information.
-      - Never mention PII of users (Full name, phone number, emails). You can use First name. This applies to all formats. Only mention PII if it is a platform contact we are providing.
-      - Use "User" if they have a Stripe account and "End User" if they do not have one.
-      - "Already know" section: what the user already knows *before* they contacted support.
-      - "Need to know" section: what new information the user needs to know from your response.
-      - All links MUST be clickable, accurate, and publicly accessible. Prioritize linking to top-level documentation or stable landing pages over deep, specific links that may change.
-      - **CRITICAL:** Double-check every URL to ensure it is active and leads to the correct, non-error page. Do not provide broken or "404 Not Found" links. For example, instead of a deep link like "https://stripe.com/docs/api/charges/object#charge_object-amount", prefer a more stable link like "https://stripe.com/docs/api/charges/object".
-      - **VERIFICATION:** Before outputting a URL, perform a mental check to ensure the domain is correct and the path is plausible. Typos in URLs are a common source of errors.
-      - When providing links, output the raw URL directly without markdown formatting (e.g., https://stripe.com/docs instead of [Stripe Docs](https://stripe.com/docs)).
-      - Include a "Distressed User Analysis" in all formats.
-
-      --- BLOCKED LINKS (DO NOT USE) ---
-      The following links have been identified as broken, not public, or otherwise incorrect. DO NOT include them in your response under any circumstances. If a necessary resource is on this list, you must explain the information in text instead of providing a link.
-      {blocked_links_list}
-      --- FORMAT-SPECIFIC RULES ---
-
-      **1. EO (Email Outline) Format**
-      - Case ID: [CASE-XXXXX]
-      - SUMMARY: Brief description of issue and resolution.
-      - ANALYSIS section containing:
-          - Steps I took: Detailed investigative steps taken by the agent, not just conclusions.
-          - Information the reply must include: Key points to cover. Place this at the end of the ANALYSIS section.
-          - Already know: What user already knows from their communications.
-          - Need to know: New information user should become aware of.
-          - To do: Next actions for the user.
-          - Outcome Summary: How the response resolves the user's issue.
-          - DSAT analysis: Risk assessment and mitigation strategies.
-          - Relevant documents: Publicly available Stripe articles and support pages (e.g., from https://stripe.com/docs or https://support.stripe.com/).
-      - Email body:
-          - Start with a proper greeting ("Hi there," or personalized).
-          - Use paragraphs separated by a blank line (a double newline) for clear spacing and readability. Avoid bullets when possible.
-          - Reference customer's name and specific issues.
-          - Close with "Best, Gee".
-      - Speculation: A concise analysis of possible causes or resolutions for the user's issue based on the provided context.
-      - Why is the case open/pending: with clear rationale.
-      - What triggered the user's dissatisfaction and distress?: for context.
-
-      **2. CL (CHAT/RAC notes) Format**
-      - Have you checked all related cases?: YES/NO/NA (Default: YES)
-      - Have you read through the entire thread?: YES/NO/NA (Default: YES)
-      - Summary of the issue: Brief description of user's problem (2-3 sentences).
-      - Steps I took: Numbered list of specific, concise investigative actions.
-      - Relevant object IDs: Bulleted list of all pertinent identifiers (acct_xxx, etc.).
-      - Final outcome: Brief explanation of resolution or next steps (1-2 sentences).
-      - Relevant documents: Publicly available Stripe articles and support pages (e.g., from https://stripe.com/docs or https://support.stripe.com/).
-      - Speculation: A concise analysis of possible causes or resolutions for the user's issue based on the provided context.
-      - Why is the case open/pending: with clear rationale.
-      - What triggered the user's dissatisfaction and distress?: for context.
-
-      **3. INV (Investigation Notes) Format**
-      - **Investigation Notes checklist**
-      - **Consent to be recorded:** [YES/NO/NA]
-      - **Authentication/Verification PIN/PII?:** [Indicate method: PIN or PII, not YES/NO]
-      - **User-Account Type** - (Delete those that do not apply) End User / Standard User (Direct Account) / Standard - Platform / Express - Platform / Custom - Platform / Standard - Connect (Connected Account) / Express - Connect (Connected Account) / Custom - Connect (Connected Account) / No Account
-      - **User-Account ID** - (Replace with the most accurate one) acct_xxx / Not Applicable
-      - **Have you checked all related cases?** [YES/NO] (Default: YES)
-      - **Have you read through the entire thread?** [YES/NO] (Default: YES)
-      - **List all user's concerns/inquiries**
-      - Topic: [Choose from the provided list]
-      - Summary of the issue: (Full summary of the issues mentioned in interaction.)
-      - Steps I took: List down/summarize the steps taken:
-          - Check Lumos (RP used) -> Name of RP when mentioned.
-          - Check Confluence -> mentioned confluence link
-          - Specific Dashboard link (Make sure it is Public URL and not Admin) -> use reference links
-          - Check Public Documentation (Docs, Support, API, etc.) -> Link (e.g., https://stripe.com/docs, https://support.stripe.com/, https://stripe.com/docs/api)
-      - Final Outcome -> Escalation / Resolution / Ask for information / Waiting for internal team actions [Provide a full summary]
-      - Why is the case open/pending:
-      - Speculation: A concise analysis of possible causes or resolutions for the user's issue based on the provided context.
-      - What triggered the user's dissatisfaction and distress?:
-      - Information the reply must include: (at the end)
-      - List of Topics: Billing, Customer portal, Invoice, Subscription, Disputes, Card Testing, Tax, Verification, Connect, Payment APIs, Money Movement.
-
-      **4. QS (Quick Summary) Format**
-      - Summary of the issue: Concise analysis of the problem. Focus on executive summary, brevity, and key insights.
-      - Case link: Admin link if applicable
-      - Case ID: ID if available
-      - Account ID: Based on account in question
-      - User-Account ID Platform: Platform ID or NA
-      - User-Account ID Connected Account: Connected account ID or NA
-      - Speculation: A concise analysis of possible causes or resolutions for the user's issue based on the provided context.
-      - What Can I tell the user?: (Provide a response ready to be copied and sent to the user, from your perspective).
-      - Relevant Stripe resources: Public links to docs, support articles, API references, etc. (e.g., from https://stripe.com/docs or https://support.stripe.com/).
-      - Relevant IDs: List of object IDs mentioned.
-      - Why is the case open/pending:
-      - What triggered the user's dissatisfaction and distress?:
-
-      **5. CF (Consult Form) Format**
-      - Consult(without a space add the following after the word, depending on the department provided: Platinum/ALO/US/RISK) (Chat/RAC)
-      - Ticket Link: (Should be provided the link usually looks like this https://admin.corp.stripe.com/case-studio?ticket_id=...)
-      - Object/Account ID(s): (Should be provided in the prompt)
-      - User issue Summary: (Analysis, 2-3 sentences max)
-      - Your Investigation: (Analysis of what was checked, 2-3 sentences max)
-      - Speculation: (A concise analysis of possible causes or resolutions based on the issue, 2-3 sentences max)
-
-      **6. EM (Empathy Statement) Format**
-      - **Goal:** Generate a list of 3-5 distinct, short, sincere, and personalized empathy statements.
-      - **Tone:** Must be warm, approachable, conversational, and human. Avoid corporate jargon or robotic phrases.
-      - **Content:** Each statement must:
-          - Directly acknowledge the user's specific pain points or frustration based on the context provided.
-          - Be solution-oriented by subtly suggesting a path forward or expressing a willingness to help resolve the issue.
-          - Offer genuine reassurance without making promises that cannot be kept.
-      - **Example structure:** "[Acknowledge feeling/problem] + [Reassurance/Offer of help]."
-      - **Output:** Present the statements as a simple list.
-
-      **7. ACK (Acknowledgement) Format**
-      - **Goal:** Generate a single, concise paragraph to acknowledge the user's message.
-      - **Tone:** Empathetic, professional, and reassuring.
-      - **Content:** The acknowledgement must:
-          - Thank the user for reaching out.
-          - Briefly acknowledge the core issue or question they've raised.
-          - Set clear expectations about the next steps (e.g., "we're looking into this," "we'll get back to you within X time"). Do not promise a specific resolution time if not provided in the context.
-          - Provide a case or reference number if available in the context.
-      - **Example Structure:** "Thanks for getting in touch. I understand you're having trouble with [issue]. We're now investigating this for you and will provide an update as soon as we have one. Your reference number is [CASE-XXXXX]."
-      - **Output:** A single paragraph of text.
-      `;
-
-      // --- Utils ---
-      const fileToBase64 = (file) => {
-          return new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.readAsDataURL(file);
-              reader.onload = () => {
-                  if (typeof reader.result === 'string') {
-                      resolve(reader.result.split(',')[1]);
-                  } else {
-                      reject(new Error('Failed to read file as base64 string.'));
-                  }
-              };
-              reader.onerror = (error) => reject(error);
-          });
-      };
-
-      // --- Gemini Service ---
-      let geminiServiceAI;
-      try {
-        geminiServiceAI = new GoogleGenAI({ apiKey: API_KEY });
-      } catch (e) {
-        console.error("Failed to initialize GoogleGenAI:", e);
-        // We'll show an error in the UI later if geminiServiceAI is undefined
-      }
-
-      const generalErrorHandler = (error) => {
-          console.error("Error calling AI API:", error);
-          if (error instanceof Error) {
-              if (error.message.includes('API key not valid')) {
-                  throw new Error("The provided AI API key is not valid and may be expired or incorrect. Please check your environment configuration.");
-              }
-              if (error.message.includes("Failed to fetch")) {
-                 throw new Error("A network error occurred. Please check your connection and try again.");
-              }
-          }
-          throw new Error("Failed to get a response from the AI API. Please try again later.");
-      };
-
-      async function* generateSupportResponseStream(
-          userInput,
-          format,
-          systemInstruction
-      ) {
-          if (!geminiServiceAI) {
-            throw new Error("AI Service is not initialized. This may be due to a missing or invalid API key.");
-          }
-          const modelName = 'gemini-2.5-flash';
-          const userPrompt = `
-              Please generate a response in the "${format}" format using the following context.
-              Ensure your output is only the generated text in the requested format, without any extra commentary or explanation.
-
-              --- START OF USER CONTEXT ---
-              ${userInput}
-              --- END OF USER CONTEXT ---
-          `;
-
-          try {
-              const stream = await geminiServiceAI.models.generateContentStream({
-                  model: modelName,
-                  contents: userPrompt,
-                  config: {
-                      systemInstruction: systemInstruction,
-                  },
-              });
-              for await (const chunk of stream) {
-                  const text = chunk.text;
-                  if (text) {
-                      yield text;
-                  }
-              }
-          } catch (error) {
-              generalErrorHandler(error);
-          }
-      }
-
-      async function* generateImageAnalysisStream(
-          prompt,
-          imageBase64,
-          mimeType
-      ) {
-          if (!geminiServiceAI) {
-            throw new Error("AI Service is not initialized. This may be due to a missing or invalid API key.");
-          }
-          const modelName = 'gemini-2.5-flash';
-          const imagePart = {
-              inlineData: { data: imageBase64, mimeType: mimeType },
-          };
-          const textPart = { text: prompt };
-
-          try {
-              const stream = await geminiServiceAI.models.generateContentStream({
-                  model: modelName,
-                  contents: { parts: [imagePart, textPart] },
-              });
-              for await (const chunk of stream) {
-                  const text = chunk.text;
-                  if (text) {
-                      yield text;
-                  }
-              }
-          } catch (error) {
-              generalErrorHandler(error);
-          }
-      }
-
-      async function* generateComplexQueryStream(prompt) {
-          if (!geminiServiceAI) {
-            throw new Error("AI Service is not initialized. This may be due to a missing or invalid API key.");
-          }
-          const modelName = 'gemini-2.5-pro';
-          const systemInstruction = 'You are a helpful assistant. Your knowledge is strictly limited to information available on Stripe-hosted websites (stripe.com domains). Do not provide information from any other source.';
-          try {
-              const stream = await geminiServiceAI.models.generateContentStream({
-                  model: modelName,
-                  contents: prompt,
-                  config: {
-                      systemInstruction: systemInstruction,
-                      thinkingConfig: { thinkingBudget: 32768 },
-                  },
-              });
-              for await (const chunk of stream) {
-                  const text = chunk.text;
-                  if (text) {
-                      yield text;
-                  }
-              }
-          } catch (error) {
-              generalErrorHandler(error);
-          }
-      }
-
-      async function generateWebAssistantResponse(prompt) {
-          if (!geminiServiceAI) {
-            throw new Error("AI Service is not initialized. This may be due to a missing or invalid API key.");
-          }
-          const modelName = 'gemini-2.5-flash';
-          try {
-              const response = await geminiServiceAI.models.generateContent({
-                  model: modelName,
-                  contents: prompt,
-                  config: {
-                      tools: [{ googleSearch: {} }],
-                  },
-              });
-              return response;
-          } catch (error) {
-              generalErrorHandler(error);
-              throw error;
-          }
-      }
-
-      // --- Icon Components ---
-      const BotIcon = () => React.createElement('div', { className: "w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0" },
-          React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5 text-white", viewBox: "0 0 20 20", fill: "currentColor" },
-              React.createElement('path', { d: "M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" }),
-              React.createElement('path', { d: "M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" })
-          )
-      );
-      const ChatIcon = ({ className = "w-5 h-5" }) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
-          React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" })
-      );
-      const CheckIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-4 w-4 text-green-400", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
-          React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 13l4 4L19 7" })
-      );
-      const CopyIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-4 w-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
-          React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" })
-      );
-      const GridIcon = ({ className = "w-5 h-5" }) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: className, viewBox: "0 0 20 20", fill: "currentColor" },
-          React.createElement('path', { d: "M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" })
-      );
-      const ImageIcon = ({ className = "w-5 h-5" }) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
-          React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" })
-      );
-      const LoadingSpinner = () => React.createElement('svg', { className: "animate-spin -ml-1 mr-3 h-5 w-5 text-white", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24" },
-          React.createElement('circle', { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
-          React.createElement('path', { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" })
-      );
-      const RefreshIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-4 w-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
-          React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 4v5h5M20 20v-5h-5M4 4a14.95 14.95 0 0114.65 11.5M20 20a14.95 14.95 0 01-14.65-11.5" })
-      );
-      const SearchIcon = ({ className = "w-5 h-5" }) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
-          React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" })
-      );
-      const SettingsIcon = ({ className = "h-6 w-6" }) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
-          React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" }),
-          React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M15 12a3 3 0 11-6 0 3 3 0 016 0z" })
-      );
-      const SparklesIcon = ({ className = "w-5 h-5" }) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: className, fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
-          React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 3v4M3 5h4M9 3v4M7 5h4M15 3v4M13 5h4M19 3v4M17 5h4M5 11v4M3 13h4M9 11v4M7 13h4M15 11v4M13 13h4M19 11v4M17 13h4M5 19v4M3 21h4M9 19v4M7 21h4M15 19v4M13 21h4M19 19v4M17 21h4" })
-      );
-      const SupportIcon = ({ className = "w-5 h-5" }) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: className, viewBox: "0 0 20 20", fill: "currentColor" },
-          React.createElement('path', { fillRule: "evenodd", d: "M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z", clipRule: "evenodd" })
-      );
-      const ThumbsDownIcon = ({ className }) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: `h-4 w-4 ${className}`, viewBox: "0 0 20 20", fill: "currentColor" },
-          React.createElement('path', { d: "M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667V3a1 1 0 00-1-1H6.636a1 1 0 00-.942.67l-1.7 5.1a1 1 0 00.354 1.165l2.788 2.788a1 1 0 001.414 0l1.42-1.42a1 1 0 000-1.414L8.58 9.42l1.42-1.42a1 1 0 000-1.414L8.58 5.17l1.42-1.42a1 1 0 001.414 0L12.586 5H13v5.667a1 1 0 001 1h1z" })
-      );
-      const ThumbsUpIcon = ({ className }) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: `h-4 w-4 ${className}`, viewBox: "0 0 20 20", fill: "currentColor" },
-          React.createElement('path', { d: "M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333V17a1 1 0 001 1h6.364a1 1 0 00.942-.67l1.7-5.1a1 1 0 00-.354-1.165l-2.788-2.788a1 1 0 00-1.414 0l-1.42 1.42a1 1 0 000 1.414l1.42 1.42L11 14.586l-1.42-1.42a1 1 0 00-1.414 0l-1.42 1.42V10.333a1 1 0 00-1-1H6z" })
-      );
-      const UserIcon = () => React.createElement('div', { className: "w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center flex-shrink-0" },
-          React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5 text-slate-300", viewBox: "0 0 20 20", fill: "currentColor" },
-              React.createElement('path', { fillRule: "evenodd", d: "M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z", clipRule: "evenodd" })
-          )
-      );
-      
-      // --- UI Components ---
-      const ImageUpload = ({ imageFile, setImageFile }) => {
-          const [preview, setPreview] = useState(null);
-          const [isDragging, setIsDragging] = useState(false);
-          const fileInputRef = useRef(null);
-
-          useEffect(() => {
-              if (!imageFile) {
-                  setPreview(null);
-                  return;
-              }
-              const objectUrl = URL.createObjectURL(imageFile);
-              setPreview(objectUrl);
-              return () => URL.revokeObjectURL(objectUrl);
-          }, [imageFile]);
-
-          const handleFileChange = (files) => {
-              if (files && files[0]) {
-                  setImageFile(files[0]);
-              }
-          };
-          
-          const onDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
-          const onDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
-          const onDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
-          const onDrop = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsDragging(false);
-              handleFileChange(e.dataTransfer.files);
-          };
-
-          const handlePaste = useCallback((e) => {
-              const items = e.clipboardData.items;
-              for (let i = 0; i < items.length; i++) {
-                  if (items[i].type.indexOf('image') !== -1) {
-                      const file = items[i].getAsFile();
-                      if (file) {
-                          setImageFile(file);
-                          break;
-                      }
-                  }
-              }
-          }, [setImageFile]);
-
-          const handleRemoveImage = () => { setImageFile(null); };
-
-          return React.createElement('div', null,
-              React.createElement('label', { className: "block text-sm font-medium text-slate-400 mb-2" }, "Upload Image"),
-              preview ? React.createElement('div', { className: "relative" },
-                  React.createElement('img', { src: preview, alt: "Preview", className: "w-full h-auto max-h-64 object-contain rounded-md bg-slate-900" }),
-                  React.createElement('button', {
-                      onClick: handleRemoveImage,
-                      className: "absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500",
-                      'aria-label': "Remove image"
-                  }, React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "2", d: "M6 18L18 6M6 6l12 12" })))
-              ) : React.createElement('div', {
-                  onDragEnter, onDragLeave, onDragOver, onDrop, onPaste, tabIndex: 0,
-                  className: `flex justify-center items-center w-full px-6 py-10 border-2 border-dashed rounded-md transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-indigo-500 ${isDragging ? 'border-indigo-500 bg-indigo-900/20' : 'border-slate-600 hover:border-slate-500 bg-slate-900/50'}`
-              },
-                  React.createElement('div', { className: "text-center" },
-                      React.createElement(ImageIcon, { className: "mx-auto h-12 w-12 text-slate-500" }),
-                      React.createElement('div', { className: "mt-4 flex text-sm text-slate-400" },
-                          React.createElement('label', { htmlFor: "file-upload", className: "relative cursor-pointer bg-slate-800 rounded-md font-medium text-indigo-400 hover:text-indigo-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-offset-slate-900 focus-within:ring-indigo-500 px-1" },
-                              React.createElement('span', null, "Upload a file"),
-                              React.createElement('input', { id: "file-upload", name: "file-upload", type: "file", className: "sr-only", onChange: (e) => handleFileChange(e.target.files), accept: "image/*", ref: fileInputRef })
-                          ),
-                          React.createElement('p', { className: "pl-1" }, "or drag and drop, or paste")
-                      ),
-                      React.createElement('p', { className: "text-xs text-slate-500 mt-1" }, "PNG, JPG, GIF up to 10MB")
-                  )
-              )
-          );
-      };
-
-      const PromptModal = ({ isOpen, onClose, currentPrompt, onSave, onReset }) => {
-          const [promptText, setPromptText] = useState(currentPrompt);
-          useEffect(() => { setPromptText(currentPrompt); }, [currentPrompt, isOpen]);
-          if (!isOpen) return null;
-          const handleSave = () => { onSave(promptText); };
-          const handleReset = () => { onReset(); };
-          return React.createElement('div', { className: "fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4", 'aria-modal': "true", role: "dialog" },
-              React.createElement('div', { className: "bg-slate-800 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" },
-                  React.createElement('div', { className: "flex justify-between items-center p-4 border-b border-slate-700" },
-                      React.createElement('h2', { className: "text-xl font-bold text-slate-100" }, "Customize System Prompt"),
-                      React.createElement('button', { onClick: onClose, className: "p-1 text-slate-500 hover:text-slate-300 rounded-full", 'aria-label': "Close" },
-                          React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-6 w-6", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
-                              React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "2", d: "M6 18L18 6M6 6l12 12" })
-                          )
-                      )
-                  ),
-                  React.createElement('div', { className: "p-6 flex-grow overflow-y-auto" },
-                      React.createElement('p', { className: "text-sm text-slate-400 mb-4" }, "You can modify the rules the AI uses to generate responses. Changes are saved locally in your browser."),
-                      React.createElement('textarea', {
-                          value: promptText,
-                          onChange: (e) => setPromptText(e.target.value),
-                          className: "w-full h-full bg-slate-900 border border-slate-700 rounded-md p-3 text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out resize-y",
-                          rows: 18
-                      })
-                  ),
-                  React.createElement('div', { className: "flex justify-between items-center p-4 border-t border-slate-700 bg-slate-800/50" },
-                      React.createElement('button', { onClick: handleReset, className: "text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-700 font-medium py-2 px-4 rounded-md transition duration-200" }, "Reset to Default"),
-                      React.createElement('div', { className: "flex items-center space-x-3" },
-                          React.createElement('button', { onClick: onClose, className: "bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-2 px-4 rounded-lg transition duration-200" }, "Cancel"),
-                          React.createElement('button', { onClick: handleSave, className: "bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-md" }, "Save Changes")
-                      )
-                  )
-              )
-          );
-      };
-
-      const FormatSelector = ({ selectedFormats, setSelectedFormats }) => {
-          const handleFormatClick = (formatId) => {
-              const newFormats = selectedFormats.includes(formatId) ? selectedFormats.filter(id => id !== formatId) : [...selectedFormats, formatId];
-              setSelectedFormats(newFormats);
-          };
-          return React.createElement('div', null,
-              React.createElement('label', { className: "block text-sm font-medium text-slate-400 mb-3" }, "Select Output Format(s)"),
-              React.createElement('div', { className: "grid grid-cols-2 md:grid-cols-3 gap-3" },
-                  RESPONSE_FORMATS.map((format) => React.createElement('button', {
-                      key: format.id, onClick: () => handleFormatClick(format.id),
-                      className: `relative text-left p-3 rounded-lg border-2 transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-indigo-500 ${selectedFormats.includes(format.id) ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-slate-700/50 border-slate-600 hover:bg-slate-700 hover:border-slate-500 text-slate-300'}`,
-                      'aria-pressed': selectedFormats.includes(format.id)
-                  }, selectedFormats.includes(format.id) && React.createElement('div', { className: "absolute top-1.5 right-1.5 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center" },
-                      React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-3.5 w-3.5 text-white", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: "3" },
-                          React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M5 13l4 4L19 7" })
-                      )
-                  ),
-                      React.createElement('p', { className: "font-bold text-sm" }, format.name),
-                      React.createElement('p', { className: "text-xs text-slate-400 mt-1" }, format.description)
-                  ))
-              )
-          );
-      };
-      
-      const InputPanel = ({
-          userInput, setUserInput, selectedFormats, setSelectedFormats, onGenerate, isLoading, onOpenSettings, isClearDisabled, onClearAll,
-      }) => {
-          const isGenerateDisabled = isLoading || !userInput.trim() || selectedFormats.length === 0;
-          const handleKeyDown = (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (!isGenerateDisabled) onGenerate(); } };
-          return React.createElement('div', { className: "bg-slate-800 rounded-lg p-6 shadow-lg flex flex-col space-y-6 h-full" },
-              React.createElement('div', { className: "flex-grow flex flex-col min-h-0" },
-                  React.createElement('div', { className: "flex justify-between items-center mb-2" },
-                      React.createElement('label', { htmlFor: "userInput", className: "block text-sm font-medium text-slate-400" }, "Case Context & User Prompt"),
-                      React.createElement('button', {
-                          onClick: onOpenSettings, className: "flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors", 'aria-label': "Customize system prompt"
-                      }, React.createElement(SettingsIcon, { className: "w-4 h-4" }), React.createElement('span', null, "Customize Rules"))
-                  ),
-                  React.createElement('div', { className: "relative w-full flex-grow" },
-                      React.createElement('textarea', {
-                          id: "userInput", value: userInput, onChange: (e) => setUserInput(e.target.value), onKeyDown: handleKeyDown,
-                          placeholder: "Paste the user's issue, case notes, or any relevant context here...",
-                          className: "w-full h-full bg-slate-900 border border-slate-700 rounded-md p-3 pr-10 text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out resize-y",
-                          rows: 10, autoFocus: true
-                      }),
-                      userInput && React.createElement('button', {
-                          onClick: () => setUserInput(''),
-                          className: "absolute top-2.5 right-2.5 p-1 text-slate-500 hover:text-slate-300 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 transition-colors",
-                          'aria-label': "Clear input"
-                      }, React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor" },
-                          React.createElement('path', { fillRule: "evenodd", d: "M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z", clipRule: "evenodd" })
-                      ))
-                  )
-              ),
-              React.createElement('div', null, React.createElement(FormatSelector, { selectedFormats, setSelectedFormats })),
-              React.createElement('div', { className: "pt-4 border-t border-slate-700" },
-                  React.createElement('div', { className: "flex items-center gap-3" },
-                      React.createElement('button', {
-                          onClick: onClearAll, disabled: isClearDisabled,
-                          className: "flex-shrink-0 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-700/50 disabled:text-slate-500 disabled:cursor-not-allowed text-slate-300 font-bold py-3 px-4 rounded-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-indigo-500",
-                          'aria-label': "Clear all inputs and outputs"
-                      }, "Clear All"),
-                      React.createElement('button', {
-                          onClick: onGenerate, disabled: isGenerateDisabled,
-                          className: "w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition duration-200 ease-in-out shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-indigo-500"
-                      }, isLoading ? React.createElement(React.Fragment, null, React.createElement(LoadingSpinner, null), "Generating...") : 'Generate Response')
-                  )
-              )
-          );
-      };
-
-      const BlinkingCursor = () => React.createElement('span', { className: "inline-block w-2 h-5 bg-indigo-400 ml-1 animate-blink" });
-
-      const OutputPlaceholder = () => React.createElement('div', { className: "text-center text-slate-500 flex flex-col items-center justify-center h-full" },
-          React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: 1.5, stroke: "currentColor", className: "w-16 h-16 mb-4 text-slate-600" },
-              React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" })
-          ),
-          React.createElement('p', { className: "font-semibold" }, "Generated response will appear here"),
-          React.createElement('p', { className: "text-sm" }, "Enter context, select a format, and click \"Generate Response\".")
-      );
-
-      const OutputPanel = ({ output, isLoading, error, onRegenerate, linkFeedback, onLinkFeedback, showLinkFeedback }) => {
-          const [copied, setCopied] = useState(false);
-          const outputContainerRef = useRef(null);
-
-          const renderedOutput = useMemo(() => {
-              if (!output) return '';
-              const preprocessUrls = (text) => {
-                  const wwwRegex = /(?<![a-zA-Z0-9+-.]:\/\/)(?<!@)\bwww\.[^\s<>()]+/g;
-                  return text.replace(wwwRegex, 'https://$&');
-              };
-              const processedOutput = preprocessUrls(output);
-              marked.setOptions({ breaks: true, gfm: true, async: false });
-              return marked.parse(processedOutput);
-          }, [output]);
-
-          useEffect(() => { if (copied) { const timer = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(timer); } }, [copied]);
-
-          useEffect(() => {
-              if (!outputContainerRef.current) return;
-              outputContainerRef.current.querySelectorAll('.link-controls-container').forEach(el => el.remove());
-              if (!showLinkFeedback) return;
-
-              const links = Array.from(outputContainerRef.current.querySelectorAll('a'));
-              links.forEach(linkElement => {
-                  const currentFeedback = linkFeedback[linkElement.href];
-                  linkElement.title = linkElement.href;
-                  linkElement.classList.toggle('link-bad', currentFeedback === 'bad');
-                  
-                  const controlsContainer = document.createElement('span');
-                  controlsContainer.className = 'link-controls-container inline-flex items-center gap-1.5 ml-1.5 align-middle';
-                  linkElement.insertAdjacentElement('afterend', controlsContainer);
-
-                  const copyButton = document.createElement('button');
-                  copyButton.className = 'inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium text-slate-300 bg-slate-700/80 hover:bg-slate-600 rounded align-middle transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-indigo-500';
-                  copyButton.setAttribute('aria-label', `Copy link: ${linkElement.href}`);
-                  copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg><span>Copy</span>`;
-                  copyButton.onclick = (e) => {
-                      e.preventDefault();
-                      navigator.clipboard.writeText(linkElement.href);
-                      const originalContent = copyButton.innerHTML;
-                      copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg><span class="text-green-400">Copied!</span>`;
-                      copyButton.disabled = true;
-                      setTimeout(() => { copyButton.innerHTML = originalContent; copyButton.disabled = false; }, 2000);
-                  };
-                  controlsContainer.appendChild(copyButton);
-
-                  const feedbackContainer = document.createElement('span');
-                  feedbackContainer.className = 'inline-flex items-center rounded-md bg-slate-700/80';
-                  const thumbsUpButton = document.createElement('button');
-                  thumbsUpButton.setAttribute('aria-label', 'Mark link as good');
-                  thumbsUpButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333V17a1 1 0 001 1h6.364a1 1 0 00.942-.67l1.7-5.1a1 1 0 00-.354-1.165l-2.788-2.788a1 1 0 00-1.414 0l-1.42 1.42a1 1 0 000 1.414l1.42 1.42L11 14.586l-1.42-1.42a1 1 0 00-1.414 0l-1.42 1.42V10.333a1 1 0 00-1-1H6z" /></svg>`;
-                  const thumbsDownButton = document.createElement('button');
-                  thumbsDownButton.setAttribute('aria-label', 'Mark link as bad');
-                  thumbsDownButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667V3a1 1 0 00-1-1H6.636a1 1 0 00-.942.67l-1.7 5.1a1 1 0 00.354 1.165l2.788 2.788a1 1 0 001.414 0l1.42-1.42a1 1 0 000-1.414L8.58 9.42l1.42-1.42a1 1 0 000-1.414L8.58 5.17l1.42-1.42a1 1 0 001.414 0L12.586 5H13v5.667a1 1 0 001 1h1z" /></svg>`;
-                  
-                  const baseClass = 'p-1 transition-colors focus:outline-none focus:ring-1 focus:ring-indigo-500';
-                  const goodSelectedClass = 'bg-green-500/30 text-green-400';
-                  const badSelectedClass = 'bg-red-500/30 text-red-400';
-                  const defaultClass = 'text-slate-400 hover:text-white hover:bg-slate-600';
-                  const disabledClass = 'text-slate-600 cursor-not-allowed';
-
-                  thumbsUpButton.className = `${baseClass} rounded-l-md ${currentFeedback === 'good' ? goodSelectedClass : (currentFeedback === 'bad' ? disabledClass : defaultClass)}`;
-                  thumbsDownButton.className = `${baseClass} rounded-r-md ${currentFeedback === 'bad' ? badSelectedClass : (currentFeedback === 'good' ? disabledClass : defaultClass)}`;
-                  
-                  thumbsUpButton.disabled = currentFeedback === 'bad';
-                  thumbsDownButton.disabled = currentFeedback === 'good';
-
-                  thumbsUpButton.onclick = (e) => { e.preventDefault(); onLinkFeedback(linkElement.href, 'good'); };
-                  thumbsDownButton.onclick = (e) => { e.preventDefault(); onLinkFeedback(linkElement.href, 'bad'); };
-                  
-                  feedbackContainer.appendChild(thumbsUpButton);
-                  feedbackContainer.appendChild(thumbsDownButton);
-                  controlsContainer.appendChild(feedbackContainer);
-              });
-          }, [renderedOutput, linkFeedback, onLinkFeedback, showLinkFeedback]);
-
-          const handleCopy = () => { navigator.clipboard.writeText(output); setCopied(true); };
-
-          return React.createElement('div', { className: "bg-slate-800 rounded-lg shadow-lg flex flex-col h-full" },
-              React.createElement('div', { className: "flex justify-between items-center p-4 border-b border-slate-700 flex-wrap gap-2" },
-                  React.createElement('h2', { className: "text-lg font-semibold text-slate-200" }, "Generated Output"),
-                  React.createElement('div', { className: "flex items-center space-x-2" },
-                      (output || error) && !isLoading && React.createElement('button', {
-                          onClick: onRegenerate, disabled: isLoading,
-                          className: "flex items-center space-x-2 text-sm bg-slate-700 hover:bg-slate-600 disabled:bg-slate-700/50 disabled:cursor-not-allowed text-slate-300 font-medium py-2 px-3 rounded-md transition duration-200",
-                          'aria-label': "Regenerate response"
-                      }, React.createElement(RefreshIcon, null), React.createElement('span', null, "Regenerate")),
-                      output && React.createElement('button', {
-                          onClick: handleCopy,
-                          className: "flex items-center space-x-2 text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium py-2 px-3 rounded-md transition duration-200",
-                          'aria-label': "Copy output text"
-                      }, copied ? React.createElement(CheckIcon, null) : React.createElement(CopyIcon, null), React.createElement('span', null, copied ? 'Copied!' : 'Copy Text'))
-                  )
-              ),
-              React.createElement('div', { className: "p-6 flex-grow relative overflow-y-auto" },
-                  isLoading && !output && React.createElement('div', { className: "absolute inset-0 bg-slate-800/80 backdrop-blur-sm flex flex-col items-center justify-center" },
-                      React.createElement(LoadingSpinner, null), React.createElement('p', { className: "mt-4 text-slate-400" }, "The AI is thinking...")
-                  ),
-                  error && React.createElement('div', { className: "text-red-400 bg-red-900/30 p-4 rounded-md" },
-                      React.createElement('p', { className: "font-bold" }, "An error occurred:"), React.createElement('p', null, error)
-                  ),
-                  !isLoading && !error && !output && React.createElement(OutputPlaceholder, null),
-                  output && React.createElement('div', {
-                      ref: outputContainerRef,
-                      className: "prose prose-sm prose-invert prose-custom max-w-none text-slate-300 leading-relaxed prose-strong:text-slate-100 prose-headings:text-slate-100 prose-a:text-indigo-400 hover:prose-a:text-indigo-300"
-                  },
-                      React.createElement('div', { dangerouslySetInnerHTML: { __html: renderedOutput } }),
-                      isLoading && React.createElement(BlinkingCursor, null)
-                  )
-              )
-          );
-      };
-
-      const SupportGenerator = () => {
-          const [output, setOutput] = useState('');
-          const [isLoading, setIsLoading] = useState(false);
-          const [error, setError] = useState(null);
-          const [userInput, setUserInput] = useState('');
-          const [selectedFormats, setSelectedFormats] = useState([RESPONSE_FORMATS[0].id]);
-          const [isModalOpen, setIsModalOpen] = useState(false);
-          const [isRegenerating, setIsRegenerating] = useState(false);
-          
-          const [systemPrompt, setSystemPrompt] = useState(() => {
-              try { return localStorage.getItem('customSystemPrompt') || AI_SYSTEM_PROMPT_RULES; }
-              catch (e) { console.error("Could not access localStorage:", e); return AI_SYSTEM_PROMPT_RULES; }
-          });
-
-          const [linkFeedback, setLinkFeedback] = useState(() => {
-              try { return JSON.parse(localStorage.getItem('linkFeedback') || '{}'); }
-              catch (e) { console.error("Could not access localStorage for link feedback:", e); return {}; }
-          });
-
-          const blockedUrls = useMemo(() => Object.entries(linkFeedback).filter(([, feedback]) => feedback === 'bad').map(([url]) => url), [linkFeedback]);
-
-          const handleGenerate = useCallback(async () => {
-              setIsLoading(true); setError(null); setOutput('');
-              if (!userInput.trim()) { setError("Please enter some context or an issue description."); setIsLoading(false); return; }
-              if (selectedFormats.length === 0) { setError("Please select at least one output format."); setIsLoading(false); return; }
-
-              try {
-                  const finalSystemPrompt = systemPrompt.replace('{blocked_links_list}', blockedUrls.length > 0 ? blockedUrls.join('\n') : 'No blocked links.');
-                  let isFirstStream = true;
-                  for (const format of selectedFormats) {
-                      if (!isFirstStream) setOutput(prev => prev + '\n\n---\n\n');
-                      isFirstStream = false;
-                      const stream = generateSupportResponseStream(userInput, format, finalSystemPrompt);
-                      for await (const chunk of stream) setOutput(prev => prev + chunk);
-                  }
-              } catch (err) { setError(err instanceof Error ? err.message : "An unknown error occurred."); }
-              finally { setIsLoading(false); }
-          }, [userInput, selectedFormats, systemPrompt, blockedUrls]);
-          
-          const handleLinkFeedback = useCallback((url, feedback) => {
-              setLinkFeedback(prevFeedback => {
-                  const newFeedback = { ...prevFeedback, [url]: feedback };
-                  try { localStorage.setItem('linkFeedback', JSON.stringify(newFeedback)); } catch (e) { console.error("Could not save link feedback to localStorage:", e); }
-                  if (feedback === 'bad') setIsRegenerating(true);
-                  return newFeedback;
-              });
-          }, []);
-
-          const handleClearAll = () => { setUserInput(''); setSelectedFormats([RESPONSE_FORMATS[0].id]); setOutput(''); setError(null); };
-          const isClearDisabled = !userInput.trim() && !output && !error;
-          useEffect(() => { if (isRegenerating) { setIsRegenerating(false); handleGenerate(); } }, [isRegenerating, handleGenerate]);
-
-          const handleSavePrompt = (newPrompt) => {
-              setSystemPrompt(newPrompt);
-              try { localStorage.setItem('customSystemPrompt', newPrompt); }
-              catch (e) { console.error("Could not save to localStorage:", e); setError("Could not save prompt settings."); }
-              setIsModalOpen(false);
-          };
-          const handleResetPrompt = () => {
-              setSystemPrompt(AI_SYSTEM_PROMPT_RULES);
-              try { localStorage.removeItem('customSystemPrompt'); } catch (e) { console.error("Could not remove from localStorage:", e); }
-          };
-          
-          return React.createElement(React.Fragment, null,
-              React.createElement('div', { className: "grid grid-cols-1 grid-rows-[auto_1fr] lg:grid-cols-2 lg:grid-rows-1 gap-8 h-full" },
-                  React.createElement(InputPanel, { userInput, setUserInput, selectedFormats, setSelectedFormats, onOpenSettings: () => setIsModalOpen(true), onGenerate: handleGenerate, isLoading, isClearDisabled, onClearAll: handleClearAll }),
-                  React.createElement(OutputPanel, { output, isLoading, error, onRegenerate: handleGenerate, linkFeedback, onLinkFeedback: handleLinkFeedback, showLinkFeedback: true })
-              ),
-              React.createElement(PromptModal, { isOpen: isModalOpen, onClose: () => setIsModalOpen(false), currentPrompt: systemPrompt, onSave: handleSavePrompt, onReset: handleResetPrompt })
-          );
-      };
-
-      const ImageAnalyzer = () => {
-          const [imageFile, setImageFile] = useState(null);
-          const [prompt, setPrompt] = useState('');
-          const [output, setOutput] = useState('');
-          const [isLoading, setIsLoading] = useState(false);
-          const [error, setError] = useState(null);
-
-          const handleGenerate = useCallback(async () => {
-              if (!imageFile || !prompt.trim()) { setError('Please upload an image and enter a prompt.'); return; }
-              setIsLoading(true); setError(null); setOutput('');
-              try {
-                  const imageBase64 = await fileToBase64(imageFile);
-                  const stream = generateImageAnalysisStream(prompt, imageBase64, imageFile.type);
-                  for await (const chunk of stream) setOutput(prev => prev + chunk);
-              } catch (err) { setError(err instanceof Error ? err.message : 'An unknown error occurred.'); }
-              finally { setIsLoading(false); }
-          }, [imageFile, prompt]);
-
-          const handleKeyDown = (event) => { if (event.key === 'Enter' && !event.shiftKey && !isLoading && prompt.trim() && imageFile) { event.preventDefault(); handleGenerate(); } };
-
-          return React.createElement('div', { className: "bg-slate-800 rounded-lg p-6 shadow-lg flex flex-col space-y-6 h-full" },
-              React.createElement('div', { className: "flex flex-col space-y-6" },
-                  React.createElement(ImageUpload, { imageFile, setImageFile }),
-                  React.createElement('div', null,
-                      React.createElement('label', { htmlFor: "image-prompt", className: "block text-sm font-medium text-slate-400 mb-2" }, "Your Prompt"),
-                      React.createElement('textarea', { id: "image-prompt", value: prompt, onChange: (e) => setPrompt(e.target.value), onKeyDown: handleKeyDown, placeholder: "e.g., What is in this image? Describe the scene.", className: "w-full bg-slate-900 border border-slate-700 rounded-md p-3 text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-h-[100px]", rows: 4 })
-                  ),
-                  React.createElement('div', { className: "pt-4 border-t border-slate-700" },
-                      React.createElement('button', { onClick: handleGenerate, disabled: isLoading || !prompt.trim() || !imageFile, className: "w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg" },
-                          isLoading ? React.createElement(React.Fragment, null, React.createElement(LoadingSpinner, null), " Analyzing...") : 'Analyze Image'
-                      )
-                  )
-              ),
-              React.createElement('div', { className: "flex-grow flex flex-col border-t border-slate-700 pt-4 min-h-0" },
-                  React.createElement('h2', { className: "text-lg font-semibold text-slate-200 mb-2" }, "Analysis Result"),
-                  React.createElement('div', { className: "p-4 bg-slate-900 rounded-md flex-grow overflow-y-auto" },
-                      isLoading && !output && React.createElement('div', { className: "flex items-center justify-center h-full text-slate-500" }, React.createElement(LoadingSpinner, null), React.createElement('p', { className: "ml-2" }, "Analyzing...")),
-                      error && React.createElement('div', { className: "text-red-400 bg-red-900/30 p-4 rounded-md" }, React.createElement('p', { className: "font-bold" }, "Error:"), React.createElement('p', null, error)),
-                      !isLoading && !error && !output && React.createElement('div', { className: "text-center text-slate-500 flex items-center justify-center h-full" }, React.createElement('p', null, "Analysis will appear here.")),
-                      output && React.createElement('div', { className: "prose prose-sm prose-invert max-w-none text-slate-300", dangerouslySetInnerHTML: { __html: marked.parse(output) } }),
-                      isLoading && output && React.createElement(BlinkingCursor, null)
-                  )
-              )
-          );
-      };
-
-      const ComplexQuery = () => {
-          const [prompt, setPrompt] = useState('');
-          const [output, setOutput] = useState('');
-          const [isLoading, setIsLoading] = useState(false);
-          const [error, setError] = useState(null);
-
-          const handleGenerate = useCallback(async () => {
-              if (!prompt.trim()) { setError('Please enter a prompt.'); return; }
-              setIsLoading(true); setError(null); setOutput('');
-              try {
-                  const stream = generateComplexQueryStream(prompt);
-                  for await (const chunk of stream) setOutput(prev => prev + chunk);
-              } catch (err) { setError(err instanceof Error ? err.message : 'An unknown error occurred.'); }
-              finally { setIsLoading(false); }
-          }, [prompt]);
-
-          const handleKeyDown = (event) => { if (event.key === 'Enter' && !event.shiftKey && !isLoading && prompt.trim()) { event.preventDefault(); handleGenerate(); } };
-
-          return React.createElement('div', { className: "bg-slate-800 rounded-lg p-6 shadow-lg flex flex-col space-y-6 h-full" },
-              React.createElement('div', null,
-                  React.createElement('label', { htmlFor: "complex-prompt", className: "block text-sm font-medium text-slate-400 mb-2" }, "Enter your complex query"),
-                  React.createElement('div', { className: "flex flex-col relative" },
-                      React.createElement('textarea', { id: "complex-prompt", value: prompt, onChange: (e) => setPrompt(e.target.value), onKeyDown: handleKeyDown, placeholder: "Ask a complex question, provide a long document to summarize...", className: "w-full bg-slate-900 border border-slate-700 rounded-md p-3 text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500", rows: 12 }),
-                      React.createElement('div', { className: "text-xs text-slate-500 pt-2 flex items-center gap-1.5" }, React.createElement(SparklesIcon, { className: "w-3 h-3 text-indigo-400" }), React.createElement('span', null, "Using a powerful AI model with enhanced thinking mode."))
-                  )
-              ),
-              React.createElement('div', { className: "pt-4 border-t border-slate-700" },
-                  React.createElement('button', { onClick: handleGenerate, disabled: isLoading || !prompt.trim(), className: "w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg" },
-                      isLoading ? React.createElement(React.Fragment, null, React.createElement(LoadingSpinner, null), " Generating...") : 'Generate Response'
-                  )
-              ),
-              React.createElement('div', { className: "flex-grow flex flex-col border-t border-slate-700 pt-4 min-h-0" },
-                  React.createElement('h2', { className: "text-lg font-semibold text-slate-200 mb-2" }, "Response"),
-                  React.createElement('div', { className: "p-4 bg-slate-900 rounded-md flex-grow overflow-y-auto" },
-                      isLoading && !output && React.createElement('div', { className: "flex items-center justify-center h-full text-slate-500" }, React.createElement(LoadingSpinner, null), React.createElement('p', { className: "ml-2" }, "The AI is thinking deeply...")),
-                      error && React.createElement('div', { className: "text-red-400 bg-red-900/30 p-4 rounded-md" }, React.createElement('p', { className: "font-bold" }, "Error:"), React.createElement('p', null, error)),
-                      output && React.createElement('div', { className: "prose prose-sm prose-invert max-w-none text-slate-300", dangerouslySetInnerHTML: { __html: marked.parse(output) } }),
-                      isLoading && output && React.createElement(BlinkingCursor, null)
-                  )
-              )
-          );
-      };
-
-      const WebAssistant = () => {
-          const [prompt, setPrompt] = useState('');
-          const [output, setOutput] = useState('');
-          const [sources, setSources] = useState([]);
-          const [isLoading, setIsLoading] = useState(false);
-          const [error, setError] = useState(null);
-
-          const handleGenerate = useCallback(async () => {
-              if (!prompt.trim()) { setError('Please enter a question or topic.'); return; }
-              setIsLoading(true); setError(null); setOutput(''); setSources([]);
-              try {
-                  const response = await generateWebAssistantResponse(prompt);
-                  setOutput(response.text);
-                  setSources(response.candidates?.[0]?.groundingMetadata?.groundingChunks || []);
-              } catch (err) { setError(err instanceof Error ? err.message : 'An unknown error occurred.'); }
-              finally { setIsLoading(false); }
-          }, [prompt]);
-
-          return React.createElement('div', { className: "bg-slate-800 rounded-lg p-6 shadow-lg flex flex-col space-y-6 h-full" },
-              React.createElement('div', null,
-                  React.createElement('label', { htmlFor: "web-prompt", className: "block text-sm font-medium text-slate-400 mb-2" }, "Ask anything..."),
-                  React.createElement('div', { className: "flex gap-4" },
-                      React.createElement('input', { id: "web-prompt", type: "text", value: prompt, onChange: (e) => setPrompt(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter' && !isLoading) { e.preventDefault(); handleGenerate(); } }, placeholder: "e.g., Who won the latest F1 race?", className: "w-full bg-slate-900 border border-slate-700 rounded-md p-3 text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" }),
-                      React.createElement('button', { onClick: handleGenerate, disabled: isLoading || !prompt.trim(), className: "flex-shrink-0 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg" },
-                          isLoading ? React.createElement(LoadingSpinner, null) : React.createElement(SearchIcon, { className: "w-5 h-5" })
-                      )
-                  ),
-                  React.createElement('div', { className: "text-xs text-slate-500 pt-2 flex items-center gap-1.5" }, React.createElement(SearchIcon, { className: "w-3 h-3 text-indigo-400" }), React.createElement('span', null, "Powered by Google Search for up-to-date information."))
-              ),
-              React.createElement('div', { className: "flex-grow flex flex-col border-t border-slate-700 pt-4 mt-4 min-h-0" },
-                  React.createElement('h2', { className: "text-lg font-semibold text-slate-200 mb-2" }, "Response"),
-                  React.createElement('div', { className: "p-4 bg-slate-900 rounded-md flex-grow overflow-y-auto" },
-                      isLoading && React.createElement('div', { className: "flex items-center justify-center h-full text-slate-500" }, React.createElement(LoadingSpinner, null), React.createElement('p', { className: "ml-2" }, "Searching the web...")),
-                      error && React.createElement('div', { className: "text-red-400 bg-red-900/30 p-4 rounded-md" }, React.createElement('p', { className: "font-bold" }, "Error:"), React.createElement('p', null, error)),
-                      !isLoading && !error && !output && React.createElement('div', { className: "text-center text-slate-500 flex items-center justify-center h-full" }, React.createElement('p', null, "Web-grounded answers will appear here.")),
-                      output && React.createElement('div', null,
-                          React.createElement('div', { className: "prose prose-sm prose-invert max-w-none text-slate-300", dangerouslySetInnerHTML: { __html: marked.parse(output) } }),
-                          sources.length > 0 && React.createElement('div', { className: "mt-6 border-t border-slate-700 pt-4" },
-                              React.createElement('h3', { className: "text-sm font-semibold text-slate-400 mb-2" }, "Sources:"),
-                              React.createElement('ul', { className: "list-none p-0 space-y-2" },
-                                  sources.map((source, index) => React.createElement('li', { key: index, className: "text-xs" },
-                                      React.createElement('a', { href: source.web.uri, target: "_blank", rel: "noopener noreferrer", className: "text-indigo-400 hover:text-indigo-300 hover:underline flex items-center gap-2" },
-                                          React.createElement('span', null, `${index + 1}.`), React.createElement('span', null, source.web.title || source.web.uri)
-                                      )
-                                  ))
-                              )
-                          )
-                      )
-                  )
-              )
-          );
-      };
-
-      const ChatBot = () => {
-          const [history, setHistory] = useState([]);
-          const [input, setInput] = useState('');
-          const [isLoading, setIsLoading] = useState(false);
-          const [error, setError] = useState(null);
-          const chatRef = useRef(null);
-          const messagesEndRef = useRef(null);
-          const ai = useMemo(() => {
-              try { return new GoogleGenAI({ apiKey: API_KEY }); }
-              catch(e) { console.error("Failed to initialize GoogleGenAI for ChatBot", e); return null; }
-          }, []);
-
-          useEffect(() => {
-              if (ai) {
-                chatRef.current = ai.chats.create({
-                    model: 'gemini-2.5-flash',
-                    config: { systemInstruction: 'You are a helpful assistant. Your knowledge is strictly limited to information available on Stripe-hosted websites (stripe.com domains). Do not provide information from any other source.' }
-                });
-              } else {
-                setError("ChatBot could not be initialized due to an API key issue.");
-              }
-          }, [ai]);
-
-          useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [history, isLoading]);
-
-          const handleSendMessage = async () => {
-              if (!input.trim() || !chatRef.current) return;
-              
-              const userMessage = { role: 'user', parts: [{ text: input }] };
-              setHistory(prev => [...prev, userMessage]);
-              const currentInput = input;
-              setInput('');
-              setIsLoading(true);
-              setError(null);
-              const modelMessage = { role: 'model', parts: [{ text: '' }] };
-              setHistory(prev => [...prev, modelMessage]);
-
-              try {
-                  const stream = await chatRef.current.sendMessageStream({ message: currentInput });
-                  for await (const chunk of stream) {
-                      if (chunk.text) {
-                          setHistory(prev => {
-                              const newHistory = [...prev];
-                              const lastMessage = newHistory[newHistory.length - 1];
-                              if (lastMessage?.role === 'model') lastMessage.parts[0].text += chunk.text;
-                              return newHistory;
-                          });
-                      }
-                  }
-              } catch (err) {
-                  const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
-                  setError(errorMessage);
-                  setHistory(prev => {
-                      const newHistory = [...prev];
-                      const lastMessage = newHistory[newHistory.length - 1];
-                      if (lastMessage?.role === 'model') lastMessage.parts[0].text = `Error: ${errorMessage}`;
-                      return newHistory;
-                  })
-              } finally {
-                  setIsLoading(false);
-              }
-          };
-
-          return React.createElement('div', { className: "bg-slate-800 rounded-lg shadow-lg flex flex-col h-full" },
-              React.createElement('div', { className: "p-4 border-b border-slate-700" }, React.createElement('h2', { className: "text-lg font-semibold text-slate-200" }, "Chat Bot")),
-              React.createElement('div', { className: "flex-grow p-4 overflow-y-auto space-y-6" },
-                  history.map((msg, index) => React.createElement('div', { key: `${msg.role}-${index}`, className: `flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : ''}` },
-                      msg.role === 'model' && React.createElement(BotIcon, null),
-                      React.createElement('div', { className: `rounded-lg p-3 max-w-xl ${msg.role === 'model' ? 'bg-slate-700' : 'bg-indigo-600'}` },
-                          React.createElement('div', { className: "prose prose-sm prose-invert max-w-none text-white", dangerouslySetInnerHTML: { __html: marked.parse(msg.parts[0].text) } }),
-                          isLoading && index === history.length - 1 && msg.role === 'model' && React.createElement(BlinkingCursor, null)
-                      ),
-                      msg.role === 'user' && React.createElement(UserIcon, null)
-                  )),
-                  React.createElement('div', { ref: messagesEndRef })
-              ),
-              React.createElement('div', { className: "p-4 border-t border-slate-700" },
-                  error && React.createElement('div', { className: "text-red-400 text-sm mb-2" }, `Error: ${error}`),
-                  React.createElement('div', { className: "flex gap-4" },
-                      React.createElement('input', { type: "text", value: input, onChange: (e) => setInput(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter' && !isLoading) { e.preventDefault(); handleSendMessage(); } }, placeholder: "Type your message...", className: "w-full bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500", disabled: isLoading }),
-                      React.createElement('button', { onClick: handleSendMessage, disabled: isLoading || !input.trim(), className: "bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-600 text-white font-bold py-3 px-5 rounded-lg" }, "Send")
-                  )
-              )
-          );
-      };
-
-      const Header = ({ activeMode, onSetMode }) => {
-          const MODES = [
-              { id: 'SUPPORT', name: 'Support Gen', icon: React.createElement(SupportIcon, null) },
-              { id: 'IMAGE', name: 'Image Analyzer', icon: React.createElement(ImageIcon, null) },
-              { id: 'COMPLEX', name: 'Complex Query', icon: React.createElement(GridIcon, null) },
-              { id: 'WEB', name: 'Web Assistant', icon: React.createElement(SearchIcon, null) },
-              { id: 'CHAT', name: 'Chat Bot', icon: React.createElement(ChatIcon, null) },
-          ];
-
-          return React.createElement('header', { className: "bg-slate-900/75 backdrop-blur-sm border-b border-slate-700 sticky top-0 z-10" },
-              React.createElement('nav', { className: "container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" },
-                  React.createElement('div', { className: "flex items-center space-x-2 sm:space-x-4 overflow-x-auto -mb-px" },
-                      MODES.map(mode => React.createElement('button', {
-                          key: mode.id, onClick: () => onSetMode(mode.id),
-                          className: `flex items-center space-x-2 px-3 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeMode === mode.id ? 'border-indigo-400 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'}`
-                      }, mode.icon, React.createElement('span', null, mode.name)))
-                  )
-              )
-          );
-      };
-
-      const App = () => {
-          const [mode, setMode] = useState('SUPPORT');
-          const [globalError, setGlobalError] = useState(null);
-
-          useEffect(() => {
-              if (!geminiServiceAI) {
-                  setGlobalError("Failed to initialize the AI Service. The API_KEY may be missing or invalid in your environment configuration.");
-              }
-              const DATA_EXPIRATION_KEY = 'lastDataClearTimestamp';
-              const TWENTY_FOUR_HOURS_IN_MS = 24 * 60 * 60 * 1000;
-              try {
-                  const lastClearTimestamp = localStorage.getItem(DATA_EXPIRATION_KEY);
-                  const now = Date.now();
-                  if (!lastClearTimestamp || (now - parseInt(lastClearTimestamp, 10) > TWENTY_FOUR_HOURS_IN_MS)) {
-                      localStorage.removeItem('customSystemPrompt');
-                      localStorage.removeItem('linkFeedback');
-                      localStorage.setItem(DATA_EXPIRATION_KEY, now.toString());
-                  }
-              } catch (error) {
-                  console.error('Failed to process data expiration logic:', error);
-              }
-          }, []);
-
-          const renderContent = () => {
-              if (globalError) {
-                  return React.createElement('div', { className: "flex items-center justify-center h-full" },
-                      React.createElement('div', { className: "max-w-2xl bg-red-900/30 border border-red-500/50 text-red-300 p-6 rounded-lg text-center" },
-                          React.createElement('h2', { className: "text-xl font-bold mb-2" }, "Application Initialization Error"),
-                          React.createElement('p', null, globalError)
-                      )
-                  );
-              }
-              switch (mode) {
-                  case 'SUPPORT': return React.createElement(SupportGenerator, null);
-                  case 'IMAGE': return React.createElement(ImageAnalyzer, null);
-                  case 'COMPLEX': return React.createElement(ComplexQuery, null);
-                  case 'WEB': return React.createElement(WebAssistant, null);
-                  case 'CHAT': return React.createElement(ChatBot, null);
-                  default: return null;
-              }
-          };
-
-          return React.createElement('div', { className: "h-screen bg-slate-900 text-slate-200 font-sans flex flex-col" },
-              React.createElement(Header, { activeMode: mode, onSetMode: setMode }),
-              React.createElement('main', { className: "p-4 md:p-8 flex-grow overflow-y-auto" },
-                  React.createElement('div', { className: "container mx-auto max-w-7xl h-full" }, renderContent())
-              )
-          );
-      };
-      
-      // --- Mount Application ---
-      const rootElement = document.getElementById('root');
-      if (!rootElement) {
-        throw new Error("Could not find root element to mount to");
-      }
-      const root = ReactDOM.createRoot(rootElement);
-      root.render(React.createElement(React.StrictMode, null, React.createElement(App, null)));
-    </script>
-  </body>
+    <script type="module" src="/index.tsx"></script>
+</body>
 </html>
